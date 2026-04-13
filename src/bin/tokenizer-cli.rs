@@ -41,7 +41,7 @@ struct Cli {
     json: bool,
 
     /// Set log level (error/warn/info/debug/trace). Defaults to 'error'.
-    #[arg(long, global = true, default_value = "error")]
+    #[arg(long, global = true, default_value = "info")]
     log_level: Level,
 
     #[command(subcommand)]
