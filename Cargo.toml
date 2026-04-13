@@ -1,0 +1,68 @@
+[package]
+name = "tokenizer-svc"
+version = "0.1.0"
+edition = "2021"
+default-run = "tokenizer-cli"
+
+[[bin]]
+name = "tokenizer-cli"
+path = "src/bin/tokenizer-cli.rs"
+
+[lib]
+name = "tokenizer_svc"
+path = "src/lib.rs"
+
+[dependencies]
+# Web framework
+axum = { version = "0.8", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "cors"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Tokenizer backends
+tokenizers = { version = "0.22", features = ["http"] }
+tiktoken-rs = "0.11"
+
+# HuggingFace Hub client
+hf-hub = { version = "0.5", features = ["tokio"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Async utilities
+async-trait = "0.1"
+tokio-util = { version = "0.7", features = ["full"] }
+
+# Metrics
+prometheus = "0.13"
+axum-prometheus = "0.8"
+
+# Config
+config = "0.15"
+serde_yaml = "0.9"
+
+# CLI argument parsing
+clap = { version = "4", features = ["derive"] }
+
+# CLI progress display
+indicatif = "0.17"
+
+# HTTP client (ModelScope download + tests)
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# Cache key / hashing
+dashmap = "6"
+
+[dev-dependencies]
+# Integration test utilities
+tokio = { version = "1", features = ["full"] }
+once_cell = "1"

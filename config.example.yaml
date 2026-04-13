@@ -1,0 +1,27 @@
+# Example configuration for tokenizer-svc
+# Copy this file to config.yaml and edit as needed.
+# All settings can also be overridden by environment variables prefixed with TOKSVC_
+# (e.g., TOKSVC_PORT=9090, TOKSVC_MODEL_SOURCE=modelscope).
+
+# Host to bind the HTTP server on
+host: "0.0.0.0"
+
+# Port to bind the HTTP server on
+port: 8080
+
+# Local directory used as cache for downloaded tokenizer files
+hf_cache_dir: "~/.cache/tokenizer-svc"
+
+# Which model hub to use for downloading tokenizers.
+# Accepted values: huggingface, modelscope
+model_source: "huggingface"
+
+# Optional HuggingFace API token (for gated / private models)
+# hf_token: "hf_..."
+
+# Optional ModelScope API token (for gated / private models on ModelScope)
+# ms_token: "..."
+
+# Whether to allow downloading tokenizers on-demand during a request.
+# If false, the model must be pre-cached.
+allow_online_download: true

@@ -1,0 +1,123 @@
+/// API contract tests — request/response shapes and error handling.
+/// These tests verify the API surface WITHOUT requiring real tokenizer backends.
+mod common;
+
+// ── /v1/token/count ───────────────────────────────────────────────────────────
+
+/// An unknown model should return 404 with a structured error body.
+#[tokio::test]
+async fn count_unknown_model_returns_404() {
+    let srv = common::spawn_server().await;
+    let res = srv
+        .client
+        .post(format!("{}/v1/token/count", srv.base_url))
+        .json(&serde_json::json!({
+            "model": "does-not-exist/fake-model",
+            "text": "Hello, world!"
+        }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(res.status(), 404);
+    let body: serde_json::Value = res.json().await.expect("json parse");
+    assert!(body["error"]["code"].is_string());
+    assert!(body["error"]["message"].is_string());
+}
+
+/// Missing required fields should return a 4xx client error.
+#[tokio::test]
+async fn count_missing_text_field_returns_error() {
+    let srv = common::spawn_server().await;
+    let res = srv
+        .client
+        .post(format!("{}/v1/token/count", srv.base_url))
+        .json(&serde_json::json!({ "model": "gpt-4o" })) // missing "text"
+        .send()
+        .await
+        .expect("request failed");
+
+    assert!(
+        res.status().is_client_error(),
+        "expected 4xx, got {}",
+        res.status()
+    );
+}
+
+// ── /v1/token/encode ──────────────────────────────────────────────────────────
+
+/// An unknown model should return 404.
+#[tokio::test]
+async fn encode_unknown_model_returns_404() {
+    let srv = common::spawn_server().await;
+    let res = srv
+        .client
+        .post(format!("{}/v1/token/encode", srv.base_url))
+        .json(&serde_json::json!({
+            "model": "does-not-exist/fake-model",
+            "text": "Hello"
+        }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(res.status(), 404);
+}
+
+/// Successful encode must return `model` + `ids` array.
+#[tokio::test]
+#[ignore = "Requires a real backend to be implemented (Phase 1)"]
+async fn encode_response_shape() {
+    let srv = common::spawn_server().await;
+    let res = srv
+        .client
+        .post(format!("{}/v1/token/encode", srv.base_url))
+        .json(&serde_json::json!({ "model": "gpt-4o", "text": "Hello" }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(res.status(), 200);
+    let body: serde_json::Value = res.json().await.expect("json parse");
+    assert!(body["model"].is_string());
+    assert!(body["ids"].is_array());
+    assert!(!body["ids"].as_array().unwrap().is_empty());
+}
+
+// ── /v1/token/decode ──────────────────────────────────────────────────────────
+
+/// An unknown model should return 404.
+#[tokio::test]
+async fn decode_unknown_model_returns_404() {
+    let srv = common::spawn_server().await;
+    let res = srv
+        .client
+        .post(format!("{}/v1/token/decode", srv.base_url))
+        .json(&serde_json::json!({
+            "model": "does-not-exist/fake-model",
+            "ids": [9906]
+        }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(res.status(), 404);
+}
+
+/// Empty ids array should return 200 with an empty string.
+#[tokio::test]
+#[ignore = "Requires a real backend to be implemented (Phase 1)"]
+async fn decode_empty_ids_returns_empty_string() {
+    let srv = common::spawn_server().await;
+    let res = srv
+        .client
+        .post(format!("{}/v1/token/decode", srv.base_url))
+        .json(&serde_json::json!({ "model": "gpt-4o", "ids": [] }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(res.status(), 200);
+    let body: serde_json::Value = res.json().await.expect("json parse");
+    assert_eq!(body["text"], "");
+}
