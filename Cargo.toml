@@ -24,11 +24,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Tokenizer backends
-tokenizers = { version = "0.22", features = ["http"] }
+tokenizers = { version = "0.22", default-features = false, features = ["progressbar", "onig", "esaxx_fast", "http", "rustls-tls"] }
 tiktoken-rs = "0.11"
 
 # HuggingFace Hub client
-hf-hub = { version = "0.5", features = ["tokio"] }
+hf-hub = { version = "0.5", default-features = false, features = ["tokio", "rustls-tls"] }
 
 # Error handling
 thiserror = "2"
@@ -57,7 +57,7 @@ clap = { version = "4", features = ["derive"] }
 indicatif = "0.17"
 
 # HTTP client (ModelScope download + tests)
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 
 # Cache key / hashing
 dashmap = "6"
