@@ -197,7 +197,7 @@
 
             .result-box {
                 margin-top: 1rem;
-                padding: 1rem;
+                padding: 1.25rem;
                 background-color: var(--bg-card);
                 border: 1px solid var(--border);
                 border-radius: 6px;
@@ -234,11 +234,141 @@
                 display: inline-block;
             }
 
+            .result-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 1rem;
+                width: 100%;
+                flex: 0 0 100%;
+                padding: 0.75rem 0 1rem 0;
+                margin-bottom: 1rem;
+                border-bottom: 2px solid var(--accent-dim);
+            }
+
+            .result-header-info {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+                min-width: 0;
+            }
+
+            .token-count-label {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: var(--text-muted);
+            }
+
+            .token-count {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: var(--accent);
+                letter-spacing: -0.02em;
+                line-height: 1.1;
+            }
+
+            .result-meta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.75rem;
+                width: 100%;
+                margin-top: 0.25rem;
+            }
+
+            .result-meta-item {
+                display: inline-flex;
+                align-items: baseline;
+                gap: 0.35rem;
+                min-width: 0;
+            }
+
+            .result-meta-label {
+                font-size: 0.72rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: var(--text-muted);
+            }
+
+            .result-meta-value {
+                font-size: 0.82rem;
+                font-weight: 600;
+                color: var(--text-main);
+            }
+
+            button.copy-btn {
+                background-color: var(--accent);
+                color: var(--bg-base);
+                border: none;
+                padding: 0.625rem 1.25rem;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 0.875rem;
+                cursor: pointer;
+                transition:
+                    transform 0.1s ease,
+                    background-color 0.2s ease,
+                    box-shadow 0.2s ease;
+                box-shadow: 0 2px 8px rgba(0, 255, 178, 0.2);
+                flex-shrink: 0;
+            }
+
+            button.copy-btn:hover {
+                background-color: #00d98e;
+                box-shadow: 0 4px 12px rgba(0, 255, 178, 0.35);
+            }
+
+            button.copy-btn:active {
+                transform: scale(0.96);
+            }
+
+            button.copy-btn.copied {
+                background-color: var(--text-main);
+                color: var(--bg-card);
+                box-shadow: 0 2px 8px rgba(244, 244, 245, 0.2);
+            }
+
             .count-display {
                 font-size: 2rem;
                 font-weight: 600;
                 color: var(--text-main);
                 letter-spacing: -0.05em;
+            }
+
+            .count-result-content {
+                display: flex;
+                align-items: baseline;
+                gap: 0.5rem;
+                width: 100%;
+            }
+
+            .count-unit {
+                font-size: 0.78rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: var(--text-muted);
+            }
+
+            .token-list {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+                width: 100%;
+            }
+
+            .text-result {
+                display: block;
+                color: var(--text-main);
+                font-family: inherit;
+                line-height: 1.7;
+                white-space: pre-wrap;
+                word-break: break-word;
+                width: 100%;
+            }
+
+            .error-message {
+                width: 100%;
             }
 
             .loader {
@@ -260,6 +390,36 @@
 
                 100% {
                     transform: rotate(360deg);
+                }
+            }
+
+            @media (max-width: 640px) {
+                body {
+                    padding: 1rem;
+                }
+
+                header {
+                    flex-direction: column;
+                    align-items: stretch;
+                    gap: 1rem;
+                }
+
+                .control-group {
+                    width: 100%;
+                }
+
+                .tabs {
+                    gap: 0.75rem;
+                    overflow-x: auto;
+                }
+
+                .result-header {
+                    flex-direction: column;
+                    align-items: stretch;
+                }
+
+                button.copy-btn {
+                    width: 100%;
                 }
             }
         </style>
@@ -317,7 +477,7 @@
                         <label for="decode-input">Token IDs</label>
                         <textarea
                             id="decode-input"
-                            placeholder="e.g. 101, 2023, 102"
+                            placeholder="e.g. 101, 2023, 102 or [101, 2023, 102]"
                             style="
                                 font-family:
                                     ui-monospace, SFMono-Regular, Menlo, Monaco,
@@ -415,10 +575,192 @@
                 el.innerHTML = '<div class="loader"></div> Processing...';
             }
 
-            function renderError(containerId, err) {
+            function nowMs() {
+                if (
+                    typeof performance !== "undefined" &&
+                    typeof performance.now === "function"
+                ) {
+                    return performance.now();
+                }
+                return Date.now();
+            }
+
+            function formatElapsedMs(elapsedMs) {
+                const safeElapsedMs = Math.max(elapsedMs, 0);
+                if (safeElapsedMs < 10) {
+                    return `${safeElapsedMs.toFixed(1)} ms`;
+                }
+                if (safeElapsedMs < 1000) {
+                    return `${Math.round(safeElapsedMs)} ms`;
+                }
+                return `${(safeElapsedMs / 1000).toFixed(2)} s`;
+            }
+
+            function createMetaRow(items) {
+                const row = document.createElement("div");
+                row.className = "result-meta";
+
+                items.forEach((item) => {
+                    const metaItem = document.createElement("div");
+                    metaItem.className = "result-meta-item";
+
+                    const label = document.createElement("span");
+                    label.className = "result-meta-label";
+                    label.textContent = item.label;
+
+                    const value = document.createElement("span");
+                    value.className = "result-meta-value";
+                    value.textContent = item.value;
+
+                    metaItem.appendChild(label);
+                    metaItem.appendChild(value);
+                    row.appendChild(metaItem);
+                });
+
+                return row;
+            }
+
+            async function timedJsonFetch(url, options) {
+                const startedAt = nowMs();
+                try {
+                    const res = await fetch(url, options);
+                    const data = await res.json();
+                    return {
+                        res,
+                        data,
+                        elapsedMs: nowMs() - startedAt,
+                    };
+                } catch (err) {
+                    if (err && typeof err === "object") {
+                        err.elapsedMs = nowMs() - startedAt;
+                    }
+                    throw err;
+                }
+            }
+
+            function renderError(containerId, err, elapsedMs) {
                 const el = document.getElementById(containerId);
                 el.className = "result-box error";
-                el.textContent = err.message || err;
+                if (typeof elapsedMs !== "number") {
+                    el.textContent = err.message || err;
+                    return;
+                }
+
+                el.innerHTML = "";
+                el.appendChild(
+                    createMetaRow([
+                        {
+                            label: "Request Time",
+                            value: formatElapsedMs(elapsedMs),
+                        },
+                    ]),
+                );
+
+                const message = document.createElement("div");
+                message.className = "error-message";
+                message.textContent = err.message || err;
+                el.appendChild(message);
+            }
+
+            function normalizeTokenId(value, position) {
+                const token = String(value).trim();
+                if (!/^\d+$/.test(token)) {
+                    throw new Error(
+                        `Invalid token ID at position ${position}: ${token}`,
+                    );
+                }
+
+                const id = Number.parseInt(token, 10);
+                if (!Number.isSafeInteger(id) || id < 0) {
+                    throw new Error(
+                        `Invalid token ID at position ${position}: ${token}`,
+                    );
+                }
+
+                return id;
+            }
+
+            function parseTokenIds(raw) {
+                const trimmed = raw.trim();
+                if (!trimmed) return [];
+
+                let normalized = trimmed
+                    .replace(/[［【]/g, "[")
+                    .replace(/[］】]/g, "]")
+                    .replace(/[，、；;]/g, ",");
+
+                if (normalized.startsWith("[") && normalized.endsWith("]")) {
+                    try {
+                        const parsed = JSON.parse(normalized);
+                        if (!Array.isArray(parsed)) {
+                            throw new Error("Token IDs must be a JSON array.");
+                        }
+                        return parsed.map((value, index) =>
+                            normalizeTokenId(value, index + 1),
+                        );
+                    } catch (err) {
+                        const inner = normalized.slice(1, -1).trim();
+                        if (!inner) return [];
+                        normalized = inner;
+                    }
+                }
+
+                const parts = normalized
+                    .split(/[\s,]+/)
+                    .map((part) => part.trim())
+                    .filter((part) => part !== "");
+
+                return parts.map((part, index) =>
+                    normalizeTokenId(part, index + 1),
+                );
+            }
+
+            function renderDecodedText(containerId, text, elapsedMs) {
+                const el = document.getElementById(containerId);
+                el.className = "result-box success";
+                el.innerHTML = "";
+                el.appendChild(
+                    createMetaRow([
+                        {
+                            label: "Request Time",
+                            value: formatElapsedMs(elapsedMs),
+                        },
+                    ]),
+                );
+
+                const content = document.createElement("div");
+                content.className = "text-result";
+                content.textContent = text;
+                el.appendChild(content);
+            }
+
+            function renderCountResult(containerId, count, elapsedMs) {
+                const el = document.getElementById(containerId);
+                el.className = "result-box success";
+                el.innerHTML = "";
+                el.appendChild(
+                    createMetaRow([
+                        {
+                            label: "Request Time",
+                            value: formatElapsedMs(elapsedMs),
+                        },
+                    ]),
+                );
+
+                const content = document.createElement("div");
+                content.className = "count-result-content";
+
+                const countDisplay = document.createElement("span");
+                countDisplay.className = "count-display";
+                countDisplay.textContent = `${count}`;
+
+                const countUnit = document.createElement("span");
+                countUnit.className = "count-unit";
+                countUnit.textContent = count === 1 ? "token" : "tokens";
+
+                content.appendChild(countDisplay);
+                content.appendChild(countUnit);
+                el.appendChild(content);
             }
 
             async function handleEncode() {
@@ -427,26 +769,87 @@
 
                 renderLoading("encode-result");
                 try {
-                    const res = await fetch("/v1/token/encode", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ model: currentModel, text }),
-                    });
-
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Encode failed");
+                    const { res, data, elapsedMs } = await timedJsonFetch(
+                        "/v1/token/encode",
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ model: currentModel, text }),
+                        },
+                    );
+                    if (!res.ok) {
+                        const err = new Error(data.error || "Encode failed");
+                        err.elapsedMs = elapsedMs;
+                        throw err;
+                    }
 
                     const el = document.getElementById("encode-result");
                     el.className = "result-box success";
                     el.innerHTML = "";
+
+                    // Header with token count and copy button
+                    const header = document.createElement("div");
+                    header.className = "result-header";
+
+                    const headerInfo = document.createElement("div");
+                    headerInfo.className = "result-header-info";
+
+                    const countLabel = document.createElement("span");
+                    countLabel.className = "token-count-label";
+                    countLabel.textContent = "Token Count";
+
+                    const countInfo = document.createElement("span");
+                    countInfo.className = "token-count";
+                    countInfo.textContent = `${data.ids.length}`;
+
+                    headerInfo.appendChild(countLabel);
+                    headerInfo.appendChild(countInfo);
+                    headerInfo.appendChild(
+                        createMetaRow([
+                            {
+                                label: "Request Time",
+                                value: formatElapsedMs(elapsedMs),
+                            },
+                        ]),
+                    );
+
+                    const copyBtn = document.createElement("button");
+                    copyBtn.className = "copy-btn";
+                    copyBtn.textContent = "Copy";
+                    copyBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        const tokenStr = data.ids.join(", ");
+                        navigator.clipboard.writeText(tokenStr).then(() => {
+                            const originalText = copyBtn.textContent;
+                            copyBtn.textContent = "Copied!";
+                            copyBtn.classList.add("copied");
+                            setTimeout(() => {
+                                copyBtn.textContent = originalText;
+                                copyBtn.classList.remove("copied");
+                            }, 2000);
+                        }).catch(() => {
+                            alert("Failed to copy");
+                        });
+                    };
+
+                    header.appendChild(headerInfo);
+                    header.appendChild(copyBtn);
+                    el.appendChild(header);
+
+                    // Token chips container
+                    const chipsContainer = document.createElement("div");
+                    chipsContainer.className = "token-list";
+
                     data.ids.forEach((id) => {
                         const span = document.createElement("span");
                         span.className = "token-chip";
                         span.textContent = id;
-                        el.appendChild(span);
+                        chipsContainer.appendChild(span);
                     });
+
+                    el.appendChild(chipsContainer);
                 } catch (err) {
-                    renderError("encode-result", err);
+                    renderError("encode-result", err, err.elapsedMs);
                 }
             }
 
@@ -454,12 +857,12 @@
                 const raw = document.getElementById("decode-input").value;
                 if (!raw || !currentModel) return;
 
-                // Parse numbers, split by commas, spaces, or newlines
-                const ids = raw
-                    .split(/[\s,]+/)
-                    .filter((x) => x.trim() !== "")
-                    .map(Number)
-                    .filter((n) => !isNaN(n));
+                let ids;
+                try {
+                    ids = parseTokenIds(raw);
+                } catch (err) {
+                    return renderError("decode-result", err);
+                }
 
                 if (ids.length === 0)
                     return renderError(
@@ -469,22 +872,24 @@
 
                 renderLoading("decode-result");
                 try {
-                    const res = await fetch("/v1/token/decode", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ model: currentModel, ids }),
-                    });
+                    const { res, data, elapsedMs } = await timedJsonFetch(
+                        "/v1/token/decode",
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ model: currentModel, ids }),
+                        },
+                    );
 
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Decode failed");
+                    if (!res.ok) {
+                        const err = new Error(data.error || "Decode failed");
+                        err.elapsedMs = elapsedMs;
+                        throw err;
+                    }
 
-                    const el = document.getElementById("decode-result");
-                    el.className = "result-box success";
-                    el.textContent = data.text;
-                    // Preserve whitespace in display
-                    el.style.whiteSpace = "pre-wrap";
+                    renderDecodedText("decode-result", data.text, elapsedMs);
                 } catch (err) {
-                    renderError("decode-result", err);
+                    renderError("decode-result", err, err.elapsedMs);
                 }
             }
 
@@ -494,20 +899,24 @@
 
                 renderLoading("count-result");
                 try {
-                    const res = await fetch("/v1/token/count", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ model: currentModel, text }),
-                    });
+                    const { res, data, elapsedMs } = await timedJsonFetch(
+                        "/v1/token/count",
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ model: currentModel, text }),
+                        },
+                    );
 
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || "Count failed");
+                    if (!res.ok) {
+                        const err = new Error(data.error || "Count failed");
+                        err.elapsedMs = elapsedMs;
+                        throw err;
+                    }
 
-                    const el = document.getElementById("count-result");
-                    el.className = "result-box success";
-                    el.innerHTML = `<span class="count-display">${data.count}</span><span style="align-self: center; margin-left: 8px;">tokens</span>`;
+                    renderCountResult("count-result", data.count, elapsedMs);
                 } catch (err) {
-                    renderError("count-result", err);
+                    renderError("count-result", err, err.elapsedMs);
                 }
             }
 
