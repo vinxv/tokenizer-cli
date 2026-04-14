@@ -1,461 +1,518 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tokenizer Dashboard</title>
-    <style>
-        :root {
-            --bg-base: #050505;
-            --bg-panel: #111111;
-            --bg-card: #18181b;
-            --border: #27272a;
-            --border-hover: #3f3f46;
-            --text-main: #f4f4f5;
-            --text-muted: #a1a1aa;
-            --accent: #00FFB2;
-            --accent-dim: rgba(0, 255, 178, 0.1);
-            --err: #ef4444;
-            --err-dim: rgba(239, 68, 68, 0.1);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            line-height: 1.5;
-            display: flex;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 2rem;
-            background-image:
-                radial-gradient(circle at 50% 0%, var(--bg-panel) 0%, transparent 50%),
-                linear-gradient(to bottom, transparent, var(--bg-base));
-        }
-
-        .container {
-            width: 100%;
-            max-width: 900px;
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-            animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @keyframes fade-in {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Tokenizer Dashboard</title>
+        <style>
+            :root {
+                --bg-base: #050505;
+                --bg-panel: #111111;
+                --bg-card: #18181b;
+                --border: #27272a;
+                --border-hover: #3f3f46;
+                --text-main: #f4f4f5;
+                --text-muted: #a1a1aa;
+                --accent: #00ffb2;
+                --accent-dim: rgba(0, 255, 178, 0.1);
+                --err: #ef4444;
+                --err-dim: rgba(239, 68, 68, 0.1);
             }
 
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            letter-spacing: -0.02em;
-        }
-
-        .subtitle {
-            color: var(--text-muted);
-            font-size: 0.875rem;
-            margin-top: 0.25rem;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            width: 300px;
-        }
-
-        label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        select,
-        input,
-        textarea {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--text-main);
-            border-radius: 6px;
-            padding: 0.75rem 1rem;
-            font-family: inherit;
-            font-size: 0.875rem;
-            transition: all 0.2s ease;
-            outline: none;
-            width: 100%;
-        }
-
-        select:focus,
-        input:focus,
-        textarea:focus {
-            border-color: var(--text-muted);
-            box-shadow: 0 0 0 1px var(--text-muted);
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 120px;
-            font-family: inherit;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 1rem;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 1.5rem;
-        }
-
-        .tab {
-            padding: 0.75rem 0;
-            color: var(--text-muted);
-            background: none;
-            border: none;
-            border-bottom: 2px solid transparent;
-            font-size: 0.875rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            margin-bottom: -1px;
-        }
-
-        .tab:hover {
-            color: var(--text-main);
-        }
-
-        .tab.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-        }
-
-        .panel {
-            display: none;
-            background: var(--bg-panel);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.5rem;
-        }
-
-        .panel.active {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        button.action {
-            background-color: var(--text-main);
-            color: var(--bg-base);
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            font-weight: 500;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: transform 0.1s ease, background-color 0.2s ease;
-            align-self: flex-start;
-        }
-
-        button.action:hover {
-            background-color: #fff;
-        }
-
-        button.action:active {
-            transform: scale(0.98);
-        }
-
-        .result-box {
-            margin-top: 1rem;
-            padding: 1rem;
-            background-color: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-            font-size: 0.875rem;
-            min-height: 60px;
-            color: var(--text-muted);
-            word-break: break-all;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.25rem;
-        }
-
-        .result-box.success {
-            color: var(--accent);
-            border-color: var(--accent-dim);
-            background-color: rgba(0, 255, 178, 0.02);
-        }
-
-        .result-box.error {
-            color: var(--err);
-            border-color: var(--err-dim);
-            background-color: rgba(239, 68, 68, 0.02);
-        }
-
-        .token-chip {
-            background-color: var(--border);
-            color: var(--text-main);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            display: inline-block;
-        }
-
-        .count-display {
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--text-main);
-            letter-spacing: -0.05em;
-        }
-
-        .loader {
-            border: 2px solid var(--border);
-            border-top: 2px solid var(--accent);
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
             }
 
-            100% {
-                transform: rotate(360deg);
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    "Helvetica Neue", Arial, sans-serif;
+                background-color: var(--bg-base);
+                color: var(--text-main);
+                line-height: 1.5;
+                display: flex;
+                justify-content: center;
+                min-height: 100vh;
+                padding: 2rem;
+                background-image:
+                    radial-gradient(
+                        circle at 50% 0%,
+                        var(--bg-panel) 0%,
+                        transparent 50%
+                    ),
+                    linear-gradient(to bottom, transparent, var(--bg-base));
             }
-        }
-    </style>
-</head>
 
-<body>
-    <div class="container">
-        <header>
-            <div>
-                <h1>Tokenizer Dashboard</h1>
-                <div class="subtitle">Real-time interaction with the tokenization microservice.</div>
-            </div>
-            <div class="control-group">
-                <label for="modelSelect">Active Model</label>
-                <select id="modelSelect">
-                    <option value="">Loading models...</option>
-                </select>
-            </div>
-        </header>
+            .container {
+                width: 100%;
+                max-width: 900px;
+                display: flex;
+                flex-direction: column;
+                gap: 2rem;
+                animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            }
 
-        <main>
-            <div class="tabs">
-                <button class="tab active" data-target="encode-panel">Encode</button>
-                <button class="tab" data-target="decode-panel">Decode</button>
-                <button class="tab" data-target="count-panel">Count</button>
-            </div>
-
-            <!-- Encode Panel -->
-            <div id="encode-panel" class="panel active">
-                <div class="control-group" style="width: 100%;">
-                    <label for="encode-input">Input Text</label>
-                    <textarea id="encode-input" placeholder="Type or paste text here..."></textarea>
-                </div>
-                <button class="action" onclick="handleEncode()">Encode</button>
-                <div class="result-box" id="encode-result">Results will appear here.</div>
-            </div>
-
-            <!-- Decode Panel -->
-            <div id="decode-panel" class="panel">
-                <div class="control-group" style="width: 100%;">
-                    <label for="decode-input">Token IDs</label>
-                    <textarea id="decode-input" placeholder="e.g. 101, 2023, 102"
-                        style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;"></textarea>
-                </div>
-                <button class="action" onclick="handleDecode()">Decode</button>
-                <div class="result-box" id="decode-result">Results will appear here.</div>
-            </div>
-
-            <!-- Count Panel -->
-            <div id="count-panel" class="panel">
-                <div class="control-group" style="width: 100%;">
-                    <label for="count-input">Input Text</label>
-                    <textarea id="count-input" placeholder="Type or paste text here..."></textarea>
-                </div>
-                <button class="action" onclick="handleCount()">Count Tokens</button>
-                <div class="result-box" id="count-result">Results will appear here.</div>
-            </div>
-        </main>
-    </div>
-
-    <script>
-        // --- State ---
-        let currentModel = "";
-
-        // --- Init ---
-        async function fetchModels() {
-            try {
-                const res = await fetch('/v1/models');
-                if (!res.ok) throw new Error('Failed to fetch models');
-                const data = await res.json();
-
-                const select = document.getElementById('modelSelect');
-                select.innerHTML = '';
-
-                if (data.models && data.models.length > 0) {
-                    data.models.forEach(m => {
-                        const opt = document.createElement('option');
-                        opt.value = m.model_id;
-                        opt.textContent = `${m.model_id} (${m.backend})`;
-                        select.appendChild(opt);
-                    });
-                    currentModel = select.value;
-                } else {
-                    select.innerHTML = '<option value="">No models loaded</option>';
+            @keyframes fade-in {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
                 }
-            } catch (err) {
-                console.error(err);
-                document.getElementById('modelSelect').innerHTML =
-                    `<option value="">Error loading models. Ensure service is running.</option>`;
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
             }
-        }
 
-        document.getElementById('modelSelect').addEventListener('change', (e) => {
-            currentModel = e.target.value;
-        });
+            header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+                padding-bottom: 1.5rem;
+                border-bottom: 1px solid var(--border);
+            }
 
-        // --- Tabs ---
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            h1 {
+                font-size: 1.5rem;
+                font-weight: 600;
+                letter-spacing: -0.02em;
+            }
 
-                tab.classList.add('active');
-                document.getElementById(tab.dataset.target).classList.add('active');
+            .subtitle {
+                color: var(--text-muted);
+                font-size: 0.875rem;
+                margin-top: 0.25rem;
+            }
+
+            .control-group {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                width: 300px;
+            }
+
+            label {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: var(--text-muted);
+                font-weight: 500;
+            }
+
+            select,
+            input,
+            textarea {
+                background-color: var(--bg-card);
+                border: 1px solid var(--border);
+                color: var(--text-main);
+                border-radius: 6px;
+                padding: 0.75rem 1rem;
+                font-family: inherit;
+                font-size: 0.875rem;
+                transition: all 0.2s ease;
+                outline: none;
+                width: 100%;
+            }
+
+            select:focus,
+            input:focus,
+            textarea:focus {
+                border-color: var(--text-muted);
+                box-shadow: 0 0 0 1px var(--text-muted);
+            }
+
+            textarea {
+                resize: vertical;
+                min-height: 120px;
+                font-family: inherit;
+            }
+
+            .tabs {
+                display: flex;
+                gap: 1rem;
+                border-bottom: 1px solid var(--border);
+                margin-bottom: 1.5rem;
+            }
+
+            .tab {
+                padding: 0.75rem 0;
+                color: var(--text-muted);
+                background: none;
+                border: none;
+                border-bottom: 2px solid transparent;
+                font-size: 0.875rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                margin-bottom: -1px;
+            }
+
+            .tab:hover {
+                color: var(--text-main);
+            }
+
+            .tab.active {
+                color: var(--accent);
+                border-bottom-color: var(--accent);
+            }
+
+            .panel {
+                display: none;
+                background: var(--bg-panel);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1.5rem;
+            }
+
+            .panel.active {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            button.action {
+                background-color: var(--text-main);
+                color: var(--bg-base);
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 6px;
+                font-weight: 500;
+                font-size: 0.875rem;
+                cursor: pointer;
+                transition:
+                    transform 0.1s ease,
+                    background-color 0.2s ease;
+                align-self: flex-start;
+            }
+
+            button.action:hover {
+                background-color: #fff;
+            }
+
+            button.action:active {
+                transform: scale(0.98);
+            }
+
+            .result-box {
+                margin-top: 1rem;
+                padding: 1rem;
+                background-color: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
+                font-size: 0.875rem;
+                min-height: 60px;
+                color: var(--text-muted);
+                word-break: break-all;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+            }
+
+            .result-box.success {
+                color: var(--accent);
+                border-color: var(--accent-dim);
+                background-color: rgba(0, 255, 178, 0.02);
+            }
+
+            .result-box.error {
+                color: var(--err);
+                border-color: var(--err-dim);
+                background-color: rgba(239, 68, 68, 0.02);
+            }
+
+            .token-chip {
+                background-color: var(--border);
+                color: var(--text-main);
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 0.75rem;
+                display: inline-block;
+            }
+
+            .count-display {
+                font-size: 2rem;
+                font-weight: 600;
+                color: var(--text-main);
+                letter-spacing: -0.05em;
+            }
+
+            .loader {
+                border: 2px solid var(--border);
+                border-top: 2px solid var(--accent);
+                border-radius: 50%;
+                width: 16px;
+                height: 16px;
+                animation: spin 1s linear infinite;
+                display: inline-block;
+                vertical-align: middle;
+                margin-right: 8px;
+            }
+
+            @keyframes spin {
+                0% {
+                    transform: rotate(0deg);
+                }
+
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="container">
+            <header>
+                <div>
+                    <h1>Tokenizer Dashboard</h1>
+                    <div class="subtitle">
+                        Real-time interaction with the tokenization
+                        microservice.
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="modelSelect">Active Model</label>
+                    <select id="modelSelect">
+                        <option value="">Loading models...</option>
+                    </select>
+                </div>
+            </header>
+
+            <main>
+                <div class="tabs">
+                    <button class="tab active" data-target="encode-panel">
+                        Encode
+                    </button>
+                    <button class="tab" data-target="decode-panel">
+                        Decode
+                    </button>
+                    <button class="tab" data-target="count-panel">Count</button>
+                </div>
+
+                <!-- Encode Panel -->
+                <div id="encode-panel" class="panel active">
+                    <div class="control-group" style="width: 100%">
+                        <label for="encode-input">Input Text</label>
+                        <textarea
+                            id="encode-input"
+                            placeholder="Type or paste text here..."
+                        ></textarea>
+                    </div>
+                    <button class="action" onclick="handleEncode()">
+                        Encode
+                    </button>
+                    <div class="result-box" id="encode-result">
+                        Results will appear here.
+                    </div>
+                </div>
+
+                <!-- Decode Panel -->
+                <div id="decode-panel" class="panel">
+                    <div class="control-group" style="width: 100%">
+                        <label for="decode-input">Token IDs</label>
+                        <textarea
+                            id="decode-input"
+                            placeholder="e.g. 101, 2023, 102"
+                            style="
+                                font-family:
+                                    ui-monospace, SFMono-Regular, Menlo, Monaco,
+                                    Consolas, monospace;
+                            "
+                        ></textarea>
+                    </div>
+                    <button class="action" onclick="handleDecode()">
+                        Decode
+                    </button>
+                    <div class="result-box" id="decode-result">
+                        Results will appear here.
+                    </div>
+                </div>
+
+                <!-- Count Panel -->
+                <div id="count-panel" class="panel">
+                    <div class="control-group" style="width: 100%">
+                        <label for="count-input">Input Text</label>
+                        <textarea
+                            id="count-input"
+                            placeholder="Type or paste text here..."
+                        ></textarea>
+                    </div>
+                    <button class="action" onclick="handleCount()">
+                        Count Tokens
+                    </button>
+                    <div class="result-box" id="count-result">
+                        Results will appear here.
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <script>
+            // --- State ---
+            let currentModel = "";
+
+            // --- Init ---
+            async function fetchModels() {
+                try {
+                    const res = await fetch("/v1/models");
+                    if (!res.ok) throw new Error("Failed to fetch models");
+                    const data = await res.json();
+
+                    const select = document.getElementById("modelSelect");
+                    select.innerHTML = "";
+
+                    if (data.models && data.models.length > 0) {
+                        data.models.forEach((m) => {
+                            const opt = document.createElement("option");
+                            opt.value = m.model_id;
+                            opt.textContent = `${m.model_id}`;
+                            select.appendChild(opt);
+                        });
+                        currentModel = select.value;
+                    } else {
+                        select.innerHTML =
+                            '<option value="">No models loaded</option>';
+                    }
+                } catch (err) {
+                    console.error(err);
+                    document.getElementById("modelSelect").innerHTML =
+                        `<option value="">Error loading models. Ensure service is running.</option>`;
+                }
+            }
+
+            document
+                .getElementById("modelSelect")
+                .addEventListener("change", (e) => {
+                    currentModel = e.target.value;
+                });
+
+            // --- Tabs ---
+            document.querySelectorAll(".tab").forEach((tab) => {
+                tab.addEventListener("click", () => {
+                    document
+                        .querySelectorAll(".tab")
+                        .forEach((t) => t.classList.remove("active"));
+                    document
+                        .querySelectorAll(".panel")
+                        .forEach((p) => p.classList.remove("active"));
+
+                    tab.classList.add("active");
+                    document
+                        .getElementById(tab.dataset.target)
+                        .classList.add("active");
+                });
             });
-        });
 
-        // --- API Calls ---
-        function renderLoading(containerId) {
-            const el = document.getElementById(containerId);
-            el.className = 'result-box';
-            el.innerHTML = '<div class="loader"></div> Processing...';
-        }
-
-        function renderError(containerId, err) {
-            const el = document.getElementById(containerId);
-            el.className = 'result-box error';
-            el.textContent = err.message || err;
-        }
-
-        async function handleEncode() {
-            const text = document.getElementById('encode-input').value;
-            if (!text || !currentModel) return;
-
-            renderLoading('encode-result');
-            try {
-                const res = await fetch('/v1/token/encode', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: currentModel, text })
-                });
-
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Encode failed');
-
-                const el = document.getElementById('encode-result');
-                el.className = 'result-box success';
-                el.innerHTML = '';
-                data.ids.forEach(id => {
-                    const span = document.createElement('span');
-                    span.className = 'token-chip';
-                    span.textContent = id;
-                    el.appendChild(span);
-                });
-            } catch (err) {
-                renderError('encode-result', err);
+            // --- API Calls ---
+            function renderLoading(containerId) {
+                const el = document.getElementById(containerId);
+                el.className = "result-box";
+                el.innerHTML = '<div class="loader"></div> Processing...';
             }
-        }
 
-        async function handleDecode() {
-            const raw = document.getElementById('decode-input').value;
-            if (!raw || !currentModel) return;
-
-            // Parse numbers, split by commas, spaces, or newlines
-            const ids = raw.split(/[\s,]+/).filter(x => x.trim() !== '').map(Number).filter(n => !isNaN(n));
-
-            if (ids.length === 0) return renderError('decode-result', 'Please enter valid numbers');
-
-            renderLoading('decode-result');
-            try {
-                const res = await fetch('/v1/token/decode', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: currentModel, ids })
-                });
-
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Decode failed');
-
-                const el = document.getElementById('decode-result');
-                el.className = 'result-box success';
-                el.textContent = data.text;
-                // Preserve whitespace in display
-                el.style.whiteSpace = 'pre-wrap';
-            } catch (err) {
-                renderError('decode-result', err);
+            function renderError(containerId, err) {
+                const el = document.getElementById(containerId);
+                el.className = "result-box error";
+                el.textContent = err.message || err;
             }
-        }
 
-        async function handleCount() {
-            const text = document.getElementById('count-input').value;
-            if (!text || !currentModel) return;
+            async function handleEncode() {
+                const text = document.getElementById("encode-input").value;
+                if (!text || !currentModel) return;
 
-            renderLoading('count-result');
-            try {
-                const res = await fetch('/v1/token/count', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: currentModel, text })
-                });
+                renderLoading("encode-result");
+                try {
+                    const res = await fetch("/v1/token/encode", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ model: currentModel, text }),
+                    });
 
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Count failed');
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Encode failed");
 
-                const el = document.getElementById('count-result');
-                el.className = 'result-box success';
-                el.innerHTML = `<span class="count-display">${data.count}</span><span style="align-self: center; margin-left: 8px;">tokens</span>`;
-            } catch (err) {
-                renderError('count-result', err);
+                    const el = document.getElementById("encode-result");
+                    el.className = "result-box success";
+                    el.innerHTML = "";
+                    data.ids.forEach((id) => {
+                        const span = document.createElement("span");
+                        span.className = "token-chip";
+                        span.textContent = id;
+                        el.appendChild(span);
+                    });
+                } catch (err) {
+                    renderError("encode-result", err);
+                }
             }
-        }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', fetchModels);
-    </script>
-</body>
+            async function handleDecode() {
+                const raw = document.getElementById("decode-input").value;
+                if (!raw || !currentModel) return;
 
+                // Parse numbers, split by commas, spaces, or newlines
+                const ids = raw
+                    .split(/[\s,]+/)
+                    .filter((x) => x.trim() !== "")
+                    .map(Number)
+                    .filter((n) => !isNaN(n));
+
+                if (ids.length === 0)
+                    return renderError(
+                        "decode-result",
+                        "Please enter valid numbers",
+                    );
+
+                renderLoading("decode-result");
+                try {
+                    const res = await fetch("/v1/token/decode", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ model: currentModel, ids }),
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Decode failed");
+
+                    const el = document.getElementById("decode-result");
+                    el.className = "result-box success";
+                    el.textContent = data.text;
+                    // Preserve whitespace in display
+                    el.style.whiteSpace = "pre-wrap";
+                } catch (err) {
+                    renderError("decode-result", err);
+                }
+            }
+
+            async function handleCount() {
+                const text = document.getElementById("count-input").value;
+                if (!text || !currentModel) return;
+
+                renderLoading("count-result");
+                try {
+                    const res = await fetch("/v1/token/count", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ model: currentModel, text }),
+                    });
+
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || "Count failed");
+
+                    const el = document.getElementById("count-result");
+                    el.className = "result-box success";
+                    el.innerHTML = `<span class="count-display">${data.count}</span><span style="align-self: center; margin-left: 8px;">tokens</span>`;
+                } catch (err) {
+                    renderError("count-result", err);
+                }
+            }
+
+            // Initialize
+            document.addEventListener("DOMContentLoaded", fetchModels);
+        </script>
+    </body>
 </html>
