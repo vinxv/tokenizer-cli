@@ -59,7 +59,7 @@ impl Registry {
             loaded: Arc::new(DashMap::new()),
             scanned: Arc::new(DashMap::new()),
             inflight: Arc::new(Mutex::new(HashMap::new())),
-            cache_dir: cfg.hf_cache_dir.clone(),
+            cache_dir: cfg.cache_dir.clone(),
             hf_token: cfg.hf_token.clone(),
             allow_online: cfg.allow_online_download,
             model_source: cfg.model_source.clone(),

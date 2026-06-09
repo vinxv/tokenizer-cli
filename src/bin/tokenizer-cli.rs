@@ -149,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
             token,
             ms_token,
         } => {
-            let cache_dir = cfg.hf_cache_dir.clone();
+            let cache_dir = cfg.cache_dir.clone();
 
             // Resolve the requested source (flag > env > default HF).
             let model_source = match source.to_lowercase().as_str() {

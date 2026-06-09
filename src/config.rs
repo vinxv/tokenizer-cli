@@ -28,10 +28,11 @@ pub struct Config {
     #[serde(default = "default_port")]
     pub port: u16,
 
-    /// Local directory used as cache for downloaded HuggingFace tokenizer files.
+    /// Local directory used as cache for downloaded tokenizer files
+    /// (shared by both HuggingFace and ModelScope backends).
     /// Default: `~/.cache/tokenizer-svc`
     #[serde(default = "default_cache_dir")]
-    pub hf_cache_dir: String,
+    pub cache_dir: String,
 
     /// Optional HuggingFace API token (for gated / private models).
     #[serde(default)]
@@ -68,11 +69,12 @@ impl Config {
             //   single underscore as the delimiter.
             // `separator("__")` — use double underscore for nested keys only,
             //   so single underscores in field names (e.g. `model_source`,
-            //   `hf_cache_dir`, `allow_online_download`) are preserved.
+            //   `cache_dir`, `allow_online_download`) are preserved.
             //
             // Example env vars:
             //   TOKSVC_MODEL_SOURCE=modelscope
             //   TOKSVC_ALLOW_ONLINE_DOWNLOAD=true
+            //   TOKSVC_CACHE_DIR=/custom/cache
             //   TOKSVC_HF_TOKEN=hf_xxx
             //   TOKSVC_MS_TOKEN=xxx
             .add_source(

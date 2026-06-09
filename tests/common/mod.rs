@@ -41,7 +41,7 @@ pub async fn spawn_server() -> TestServer {
     let cfg = Config {
         host: "127.0.0.1".to_string(),
         port: 0, // OS picks a free port
-        hf_cache_dir: test_cache_dir
+        cache_dir: test_cache_dir
             .clone()
             .unwrap_or_else(|| "/tmp/toksvc-test-cache".to_string()),
         hf_token: std::env::var("HF_TOKEN").ok(),
@@ -56,9 +56,9 @@ pub async fn spawn_server() -> TestServer {
     // runs. When a caller supplies TOKSVC_TEST_CACHE_DIR, it is intentionally
     // treated as a pre-populated cache and preserved.
     if test_cache_dir.is_none() {
-        let _ = std::fs::remove_dir_all(&cfg.hf_cache_dir);
+        let _ = std::fs::remove_dir_all(&cfg.cache_dir);
     }
-    let _ = std::fs::create_dir_all(&cfg.hf_cache_dir);
+    let _ = std::fs::create_dir_all(&cfg.cache_dir);
 
     let state = AppState::new(&cfg).await.expect("AppState::new failed");
     let app = build_router(state, false);

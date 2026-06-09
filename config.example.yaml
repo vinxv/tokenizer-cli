@@ -10,7 +10,7 @@ host: "0.0.0.0"
 port: 8080
 
 # Local directory used as cache for downloaded tokenizer files
-hf_cache_dir: "~/.cache/tokenizer-svc"
+cache_dir: "~/.cache/tokenizer-svc"
 
 # Which model hub to use for downloading tokenizers.
 # Accepted values: huggingface, modelscope
