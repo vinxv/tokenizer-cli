@@ -20,7 +20,7 @@ async fn list_models_empty_on_startup() {
 
 /// After loading a model it appears in the `/v1/models` listing.
 #[tokio::test]
-#[ignore = "Requires internet access: set TOKSVC_ALLOW_ONLINE=1 to run"]
+#[ignore = "Requires cached Qwen/Qwen3-32B: set TOKSVC_TEST_CACHE_DIR"]
 async fn list_models_after_hf_load() {
     let srv = common::spawn_server().await;
 
@@ -28,7 +28,7 @@ async fn list_models_after_hf_load() {
     let res = srv
         .client
         .post(format!("{}/v1/token/count", srv.base_url))
-        .json(&serde_json::json!({ "model": "bert-base-uncased", "text": "hello" }))
+        .json(&serde_json::json!({ "model": "Qwen/Qwen3-32B", "text": "hello" }))
         .send()
         .await
         .expect("count request failed");
@@ -46,7 +46,9 @@ async fn list_models_after_hf_load() {
     let body: serde_json::Value = models_res.json().await.expect("json parse");
     let models = body["models"].as_array().expect("models array");
     assert!(
-        models.iter().any(|m| m["model_id"] == "bert-base-uncased" && m["status"] == "loaded"),
-        "bert-base-uncased should appear in /v1/models with status 'loaded' after being explicitly used"
+        models
+            .iter()
+            .any(|m| m["model_id"] == "Qwen/Qwen3-32B" && m["status"] == "loaded"),
+        "Qwen/Qwen3-32B should appear in /v1/models with status 'loaded' after being explicitly used"
     );
 }

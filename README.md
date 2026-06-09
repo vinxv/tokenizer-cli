@@ -4,7 +4,7 @@ A high-performance, Rust-based microservice and CLI for LLM tokenization. It pro
 
 ## Features
 
-- **Multi-Backend Support**: Integration with `tokenizers` (HuggingFace) and `tiktoken-rs` (OpenAI).
+- **Multi-Backend Support**: Integration with `fastokens` for BPE `tokenizer.json` files and `tiktoken-rs` for planned OpenAI support.
 - **Multi-Hub Model Pulling**: Seamlessly download models from **HuggingFace Hub** and **ModelScope**.
 - **Unified CLI**: A single binary for serving the API, pulling models, and performing token operations.
 - **REST API**: Standardized endpoints for token counting, encoding, decoding, and model discovery.
@@ -32,10 +32,10 @@ Download a tokenizer from HuggingFace (default) or ModelScope:
 
 ```bash
 # Pull from HuggingFace
-./target/release/tokenizer-cli pull bert-base-uncased
+./target/release/tokenizer-cli pull Qwen/Qwen3-32B
 
 # Pull from ModelScope
-./target/release/tokenizer-cli pull iic/nlp_corom_sentence-embedding_chinese-base --source modelscope
+./target/release/tokenizer-cli pull Qwen/Qwen2.5-0.5B-Instruct --source modelscope
 ```
 
 ### 3. Start the Service
@@ -74,12 +74,12 @@ Returns a list of all models discovered in the cache or loaded in memory.
 **Response**: `{"model": "gpt-4o", "count": 2}`
 
 ### POST `/v1/token/encode`
-**Body**: `{"model": "bert-base-uncased", "text": "Hello world"}`
-**Response**: `{"model": "bert-base-uncased", "ids": [7592, 2088]}`
+**Body**: `{"model": "Qwen/Qwen3-32B", "text": "Hello world"}`
+**Response**: `{"model": "Qwen/Qwen3-32B", "ids": [9707, 1879]}`
 
 ### POST `/v1/token/decode`
-**Body**: `{"model": "bert-base-uncased", "ids": [7592, 2088]}`
-**Response**: `{"model": "bert-base-uncased", "text": "hello world"}`
+**Body**: `{"model": "Qwen/Qwen3-32B", "ids": [9707, 1879]}`
+**Response**: `{"model": "Qwen/Qwen3-32B", "text": "Hello world"}`
 
 ### GET `/metrics`
 Exposes Prometheus-formatted metrics.

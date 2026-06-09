@@ -75,8 +75,8 @@ enum Command {
     /// Source defaults to `huggingface`; set `--source modelscope` to pull
     /// from <https://www.modelscope.cn> instead.
     Pull {
-        /// Model id, e.g. `bert-base-uncased` (HF) or
-        /// `iic/nlp_corom_sentence-embedding_chinese-base` (ModelScope).
+        /// Model id, e.g. `Qwen/Qwen3-32B` (HF) or
+        /// `Qwen/Qwen2.5-0.5B-Instruct` (ModelScope).
         model: String,
 
         /// Model hub to download from (`huggingface` or `modelscope`).
@@ -97,7 +97,7 @@ enum Command {
 
     /// Count tokens in TEXT using MODEL (mirrors POST /v1/token/count).
     Count {
-        /// Model id or OpenAI alias, e.g. `gpt-4o` or `bert-base-uncased`.
+        /// Model id or OpenAI alias, e.g. `gpt-4o` or `Qwen/Qwen3-32B`.
         model: String,
         /// Text to count tokens in.
         text: String,

@@ -10,12 +10,11 @@
 ///   TOKSVC_MODEL_SOURCE=modelscope TOKSVC_ALLOW_ONLINE=1 \
 ///     cargo test --test test_token_ms -- --ignored --nocapture
 ///
-/// The test model used here is a small, public Chinese sentence-embedding
-/// model from IIC (Alibaba DAMO Academy) that ships a standard tokenizer.json:
-///   <https://www.modelscope.cn/models/iic/nlp_corom_sentence-embedding_chinese-base>
+/// The test model used here is a public BPE tokenizer.json model:
+///   <https://www.modelscope.cn/models/Qwen/Qwen2.5-0.5B-Instruct>
 mod common;
 
-const MS_MODEL: &str = "iic/nlp_corom_sentence-embedding_chinese-base";
+const MS_MODEL: &str = "Qwen/Qwen2.5-0.5B-Instruct";
 
 /// Token count must be deterministic and non-zero.
 #[tokio::test]
@@ -73,8 +72,6 @@ async fn ms_encode_decode_roundtrip() {
     let dec_body: serde_json::Value = dec_res.json().await.expect("json");
     let decoded = dec_body["text"].as_str().expect("text field");
 
-    // A round-trip through a WordPiece tokenizer may insert spaces between
-    // characters; just verify a known substring appears.
     assert!(
         decoded.contains('快') || decoded.contains("快速"),
         "decoded '{decoded}' does not resemble original '{original}'"

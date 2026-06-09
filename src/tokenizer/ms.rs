@@ -11,11 +11,10 @@
 ///   ?Revision=master&FilePath={filename}
 /// ```
 ///
-/// # Vocab-only fallback
-/// Older BERT-style models on ModelScope ship only `vocab.txt` (no
-/// `tokenizer.json`).  When that happens `pull()` still succeeds as long as
-/// `vocab.txt` is present, and `load()` synthesises a `tokenizer.json` from
-/// the vocab file using the `tokenizers` crate's WordPiece builder.
+/// # BPE tokenizer requirement
+/// `fastokens` 0.2.x loads BPE `tokenizer.json` files. Repositories that only
+/// ship `vocab.txt`, or use non-BPE tokenizer models, are not supported by this
+/// backend.
 ///
 /// # Authentication
 /// ModelScope uses a session cookie (`m_session_id`) rather than a Bearer
@@ -73,73 +72,6 @@ fn file_url(namespace: &str, name: &str, filename: &str) -> String {
     )
 }
 
-/// Synthesise a `tokenizer.json` from `vocab.txt` when a ModelScope repo does
-/// not provide one (common for older BERT-style models).
-///
-/// Reads `do_lower_case` from `tokenizer_config.json` if present (defaults `true`).
-/// The generated file is written next to `vocab.txt` so future runs hit the
-/// cache and skip the synthesis step.
-fn build_bert_tokenizer_json(
-    files: &[(String, PathBuf)],
-    vocab_path: &Path,
-    model_id: &str,
-) -> AppResult<PathBuf> {
-    use tokenizers::{
-        decoders::wordpiece::WordPiece as WordPieceDecoder, models::wordpiece::WordPiece,
-        normalizers::bert::BertNormalizer, pre_tokenizers::bert::BertPreTokenizer, Tokenizer,
-    };
-
-    // Respect `do_lower_case` from tokenizer_config.json if available.
-    let do_lower_case = files
-        .iter()
-        .find(|(n, _)| n == "tokenizer_config.json")
-        .and_then(|(_, p)| fs::read_to_string(p).ok())
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-        .and_then(|v| v["do_lower_case"].as_bool())
-        .unwrap_or(true);
-
-    let vocab_str = vocab_path.to_str().ok_or_else(|| AppError::LoadError {
-        model: model_id.to_string(),
-        reason: "vocab.txt path contains non-UTF-8 characters".to_string(),
-    })?;
-
-    let wordpiece = WordPiece::from_file(vocab_str)
-        .unk_token("[UNK]".into())
-        .build()
-        .map_err(|e| AppError::LoadError {
-            model: model_id.to_string(),
-            reason: format!("failed to build WordPiece model from vocab.txt: {e}"),
-        })?;
-
-    let mut tokenizer = Tokenizer::new(wordpiece);
-    tokenizer.with_normalizer(Some(BertNormalizer::new(
-        true, // clean_text
-        true, // handle_chinese_chars
-        None, // strip_accents (None = deduce from lowercase)
-        do_lower_case,
-    )));
-    tokenizer.with_pre_tokenizer(Some(BertPreTokenizer));
-    tokenizer.with_decoder(Some(WordPieceDecoder::default()));
-
-    let out_path = vocab_path
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .join("tokenizer.json");
-
-    tokenizer
-        .save(&out_path, true)
-        .map_err(|e| AppError::LoadError {
-            model: model_id.to_string(),
-            reason: format!("failed to write synthesised tokenizer.json: {e}"),
-        })?;
-
-    info!(
-        "Synthesised tokenizer.json from vocab.txt for '{model_id}' → {out_path:?} \
-         (do_lower_case={do_lower_case})"
-    );
-    Ok(out_path)
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /// Download all known tokenizer files for `model_id` from ModelScope into the
@@ -148,9 +80,7 @@ fn build_bert_tokenizer_json(
 /// Unlike the HF backend, **every** file is treated as optional during
 /// download; completeness is verified at the end:
 /// - If `tokenizer.json` was downloaded → ready for `HfTokenizer::from_path`.
-/// - If only `vocab.txt` was downloaded → `load()` will synthesise a
-///   `tokenizer.json` from it.
-/// - If neither was downloaded → `AppError::ModelNotFound`.
+/// - If `tokenizer.json` is missing → `AppError::ModelNotFound`.
 ///
 /// Returns a list of `(filename, local_path)` for every file fetched.
 pub async fn pull(
@@ -248,10 +178,9 @@ pub async fn pull(
         results.push((filename.to_string(), local));
     }
 
-    // Completeness check: need tokenizer.json OR vocab.txt to proceed.
+    // Completeness check: fastokens requires tokenizer.json.
     let has_tokenizer_json = results.iter().any(|(n, _)| n == "tokenizer.json");
-    let has_vocab_txt = results.iter().any(|(n, _)| n == "vocab.txt");
-    if !has_tokenizer_json && !has_vocab_txt {
+    if !has_tokenizer_json {
         return Err(AppError::ModelNotFound(model_id.to_string()));
     }
 
@@ -262,8 +191,6 @@ pub async fn pull(
 ///
 /// 1. Downloads all available tokenizer files via `pull()`.
 /// 2. If `tokenizer.json` is present, passes it to `HfTokenizer::from_path`.
-/// 3. If only `vocab.txt` is present, synthesises a BERT WordPiece
-///    `tokenizer.json` (cached), then loads that.
 pub async fn load(
     model_id: &str,
     cache_dir: &str,
@@ -273,9 +200,8 @@ pub async fn load(
 
     let (namespace, name) = split_model_id(model_id)?;
     let local_tokenizer_json = cache_path(cache_dir, namespace, name, "tokenizer.json");
-    let local_vocab_txt = cache_path(cache_dir, namespace, name, "vocab.txt");
 
-    let files = if local_tokenizer_json.exists() || local_vocab_txt.exists() {
+    let files = if local_tokenizer_json.exists() {
         debug!("ModelScope tokenizer data already cached for '{model_id}', skipping pull");
         let mut results = Vec::new();
         for &(filename, _) in TOKENIZER_FILES {
@@ -289,30 +215,14 @@ pub async fn load(
         pull(model_id, cache_dir, ms_token).await?
     };
 
-    // Resolve tokenizer.json path — either downloaded directly or synthesised
-    // from vocab.txt in a spawn_blocking task.
+    // Resolve tokenizer.json path from either the existing cache or the
+    // freshly downloaded file set.
     let model_id_owned = model_id.to_string();
 
     let tokenizer_path = if let Some((_, p)) = files.iter().find(|(n, _)| n == "tokenizer.json") {
         p.clone()
     } else {
-        // Vocab-only model: build tokenizer.json from vocab.txt.
-        let vocab_path = files
-            .iter()
-            .find(|(n, _)| n == "vocab.txt")
-            .map(|(_, p)| p.clone())
-            .ok_or_else(|| AppError::ModelNotFound(model_id_owned.clone()))?;
-
-        let files_clone = files.clone();
-        let mid = model_id_owned.clone();
-        tokio::task::spawn_blocking(move || {
-            build_bert_tokenizer_json(&files_clone, &vocab_path, &mid)
-        })
-        .await
-        .map_err(|e| AppError::LoadError {
-            model: model_id_owned.clone(),
-            reason: format!("join error while synthesising tokenizer.json: {e}"),
-        })??
+        return Err(AppError::ModelNotFound(model_id_owned));
     };
 
     // Parse tokenizer.json (blocking I/O) via the shared HfTokenizer path.

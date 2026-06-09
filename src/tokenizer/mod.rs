@@ -16,7 +16,7 @@ pub struct TokenizerInfo {
 /// Discriminates which backend is handling a given model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenizerBackendKind {
-    /// HuggingFace `tokenizers` crate (BPE, WordPiece, Unigram, …)
+    /// HuggingFace / ModelScope BPE tokenizer loaded through `fastokens`
     HuggingFace,
     /// OpenAI `tiktoken` (cl100k_base, o200k_base, …)
     Tiktoken,

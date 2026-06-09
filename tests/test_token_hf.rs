@@ -2,23 +2,25 @@
 ///
 /// All tests are `#[ignore]` by default — they require:
 ///   - Phase 1 implementation of `HfTokenizer::load`
-///   - Internet access (`TOKSVC_ALLOW_ONLINE=1`)
+///   - A cache dir containing `Qwen/Qwen3-32B` tokenizer files
 ///   - Optional `HF_TOKEN` for gated models
+///   - A BPE tokenizer.json model supported by fastokens
 ///
 /// Run with:
-///   TOKSVC_ALLOW_ONLINE=1 cargo test --test test_token_hf -- --ignored
+///   TOKSVC_TEST_CACHE_DIR="$HOME/.cache/tokenizer-svc" \
+///     cargo test --test test_token_hf -- --ignored --test-threads=1
 mod common;
 
 /// Token count must be deterministic and non-zero.
 #[tokio::test]
-#[ignore = "Requires internet access: set TOKSVC_ALLOW_ONLINE=1 to run"]
+#[ignore = "Requires cached Qwen/Qwen3-32B: set TOKSVC_TEST_CACHE_DIR"]
 async fn hf_count_is_nonzero() {
     let srv = common::spawn_server().await;
     let res = srv
         .client
         .post(format!("{}/v1/token/count", srv.base_url))
         .json(&serde_json::json!({
-            "model": "bert-base-uncased",
+            "model": "Qwen/Qwen3-32B",
             "text": "Hello, world!"
         }))
         .send()
@@ -33,7 +35,7 @@ async fn hf_count_is_nonzero() {
 
 /// Encode → Decode must round-trip (identity property).
 #[tokio::test]
-#[ignore = "Requires internet access: set TOKSVC_ALLOW_ONLINE=1 to run"]
+#[ignore = "Requires cached Qwen/Qwen3-32B: set TOKSVC_TEST_CACHE_DIR"]
 async fn hf_encode_decode_roundtrip() {
     let srv = common::spawn_server().await;
     let original = "The quick brown fox jumps over the lazy dog";
@@ -41,7 +43,7 @@ async fn hf_encode_decode_roundtrip() {
     let enc_res = srv
         .client
         .post(format!("{}/v1/token/encode", srv.base_url))
-        .json(&serde_json::json!({ "model": "bert-base-uncased", "text": original }))
+        .json(&serde_json::json!({ "model": "Qwen/Qwen3-32B", "text": original }))
         .send()
         .await
         .expect("encode request failed");
@@ -54,7 +56,7 @@ async fn hf_encode_decode_roundtrip() {
     let dec_res = srv
         .client
         .post(format!("{}/v1/token/decode", srv.base_url))
-        .json(&serde_json::json!({ "model": "bert-base-uncased", "ids": ids }))
+        .json(&serde_json::json!({ "model": "Qwen/Qwen3-32B", "ids": ids }))
         .send()
         .await
         .expect("decode request failed");
@@ -75,10 +77,10 @@ async fn hf_encode_decode_roundtrip() {
 
 /// Count is >= 1 for short inputs across multiple public models.
 #[tokio::test]
-#[ignore = "Requires internet access: set TOKSVC_ALLOW_ONLINE=1 to run"]
+#[ignore = "Requires cached Qwen/Qwen3-32B: set TOKSVC_TEST_CACHE_DIR"]
 async fn hf_count_single_word_multiple_models() {
     let srv = common::spawn_server().await;
-    for model in &["bert-base-uncased", "gpt2"] {
+    for model in &["Qwen/Qwen3-32B"] {
         let res = srv
             .client
             .post(format!("{}/v1/token/count", srv.base_url))

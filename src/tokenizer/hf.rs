@@ -1,22 +1,22 @@
 /// HuggingFace tokenizer backend.
 ///
-/// Combines `hf-hub` (file download + caching) with the `tokenizers` crate
-/// (BPE / WordPiece / Unigram encode-decode).
+/// Combines `hf-hub` (file download + caching) with the `fastokens` crate.
+/// `fastokens` 0.2.x supports BPE tokenizer.json files.
 ///
 /// # Loading flow
 /// 1. `hf-hub::api::tokio::ApiBuilder` is configured with an optional bearer
 ///    token and a custom cache directory.
 /// 2. `repo.get("tokenizer.json")` either returns a cached path or streams
 ///    the file from the Hub and writes it to the local cache.
-/// 3. `tokenizers::Tokenizer::from_file(path)` parses the JSON and builds
+/// 3. `fastokens::Tokenizer::from_file(path)` parses the JSON and builds
 ///    the in-memory tokenizer.
 /// 4. The resulting tokenizer is stored in an `Arc` for cheap, lock-free
 ///    sharing across concurrent requests.
 use std::{path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
+use fastokens::Tokenizer;
 use hf_hub::{api::tokio::ApiBuilder, Repo, RepoType};
-use tokenizers::Tokenizer;
 use tracing::{debug, info, warn};
 
 use crate::error::{AppError, AppResult};
@@ -107,8 +107,7 @@ pub async fn pull(
 
 /// Concrete HuggingFace-backed tokenizer.
 ///
-/// The inner `tokenizers::Tokenizer` is already thread-safe (`Send + Sync`),
-/// so we only need an `Arc` — no `Mutex` or `RwLock`.
+/// The inner `fastokens::Tokenizer` is shared behind an `Arc`.
 pub struct HfTokenizer {
     model_id: String,
     inner: Arc<Tokenizer>,
@@ -119,7 +118,7 @@ impl HfTokenizer {
     /// Load (or restore from local cache) the tokenizer for `model_id`.
     ///
     /// # Arguments
-    /// * `model_id`  — HuggingFace repo id, e.g. `"bert-base-uncased"`.
+    /// * `model_id`  — HuggingFace repo id, e.g. `"Qwen/Qwen3-32B"`.
     /// * `cache_dir` — Directory where downloaded files are stored.
     ///   If empty the hf-hub default (`~/.cache/huggingface/hub`) is used.
     /// * `hf_token`  — Optional bearer token for private / gated models.
@@ -172,7 +171,7 @@ impl HfTokenizer {
             tokenizer_path
         );
 
-        // Load using the tokenizers crate (blocking I/O — offload to threadpool)
+        // Load using fastokens (blocking I/O — offload to threadpool)
         let model_id_owned = model_id.to_string();
         let tokenizer = tokio::task::spawn_blocking(move || {
             Tokenizer::from_file(&tokenizer_path).map_err(|e| AppError::LoadError {
@@ -186,7 +185,7 @@ impl HfTokenizer {
             reason: format!("join error during tokenizer load: {e}"),
         })??;
 
-        let vocab_size = tokenizer.get_vocab_size(true);
+        let vocab_size = tokenizer.vocab_size();
 
         info!("Loaded HF tokenizer for '{model_id}' (vocab_size={vocab_size})");
 
@@ -216,7 +215,7 @@ impl HfTokenizer {
             reason: format!("failed to parse tokenizer.json: {e}"),
         })?;
 
-        let vocab_size = tokenizer.get_vocab_size(true);
+        let vocab_size = tokenizer.vocab_size();
         info!("Parsed tokenizer for '{model_id}' from {path:?} (vocab_size={vocab_size})");
 
         Ok(Self {
@@ -244,8 +243,7 @@ impl TokenizerBackend for HfTokenizer {
 
         tokio::task::spawn_blocking(move || {
             inner
-                .encode(text, true)
-                .map(|enc| enc.get_ids().to_vec())
+                .encode_with_special_tokens(&text, true)
                 .map_err(|e| AppError::TokenizerError(format!("[{model_id}] encode failed: {e}")))
         })
         .await
