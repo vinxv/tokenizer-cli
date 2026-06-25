@@ -39,6 +39,7 @@ pub struct CountResponse {
 pub struct EncodeResponse {
     pub model: String,
     pub ids: Vec<u32>,
+    pub tokens: Vec<String>,
 }
 
 /// Response for `/v1/token/decode`.
@@ -70,9 +71,11 @@ pub async fn encode(
 ) -> AppResult<Json<EncodeResponse>> {
     let tok = state.registry.get_or_load(&req.model).await?;
     let ids = tok.encode(&req.text).await?;
+    let tokens = tok.token_texts(&ids).await?;
     Ok(Json(EncodeResponse {
         model: req.model,
         ids,
+        tokens,
     }))
 }
 

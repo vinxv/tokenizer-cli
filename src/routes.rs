@@ -44,6 +44,8 @@ pub fn build_router(state: AppState, enable_web: bool) -> Router {
         .route("/v1/token/count", post(handlers::token::count))
         .route("/v1/token/encode", post(handlers::token::encode))
         .route("/v1/token/decode", post(handlers::token::decode))
+        // ── Chat template rendering ─────────────────────────────────────────
+        .route("/v1/chat/render", post(handlers::chat::render))
         // ── Model listing ───────────────────────────────────────────────────
         .route("/v1/models", get(handlers::models::list_models))
         // ── Middleware ──────────────────────────────────────────────────────

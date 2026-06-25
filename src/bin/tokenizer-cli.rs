@@ -327,6 +327,9 @@ fn cmd_models(state: &AppState, as_json: bool) {
                 "model_id": info.model_id,
                 "vocab_size": info.vocab_size,
                 "backend": info.backend.to_string(),
+                "has_chat_template": info.has_chat_template,
+                "chat_template_source": info.chat_template_source,
+                "chat_template_name": info.chat_template_name,
             })
         })
         .collect();
@@ -375,13 +378,18 @@ async fn cmd_encode(
 ) -> anyhow::Result<()> {
     let tok = state.registry.get_or_load(&model).await?;
     let ids = tok.encode(&text).await?;
+    let tokens = tok.token_texts(&ids).await?;
 
     if as_json {
-        println!("{}", json!({ "model": model, "ids": ids }));
+        println!(
+            "{}",
+            json!({ "model": model, "ids": ids, "tokens": tokens })
+        );
     } else {
         let ids_str: Vec<String> = ids.iter().map(|i| i.to_string()).collect();
         println!("model: {model}");
         println!("ids:   [{}]", ids_str.join(", "));
+        println!("tokens: [{}]", tokens.join(", "));
     }
     Ok(())
 }

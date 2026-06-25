@@ -46,6 +46,15 @@ pub trait TokenizerBackend: Send + Sync {
     /// Decodes a sequence of token ids back to a string.
     async fn decode(&self, ids: &[u32]) -> AppResult<String>;
 
+    /// Decodes each token id independently for token-list inspection.
+    async fn token_texts(&self, ids: &[u32]) -> AppResult<Vec<String>> {
+        let mut tokens = Vec::with_capacity(ids.len());
+        for id in ids {
+            tokens.push(self.decode(&[*id]).await?);
+        }
+        Ok(tokens)
+    }
+
     /// Counts tokens in `text`. Default implementation wraps `encode`.
     async fn count(&self, text: &str) -> AppResult<usize> {
         Ok(self.encode(text).await?.len())

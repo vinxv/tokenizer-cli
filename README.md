@@ -2,6 +2,42 @@
 
 A high-performance, Rust-based microservice and CLI for LLM tokenization. It provides a unified interface for HuggingFace, ModelScope, and OpenAI (tiktoken) tokenizers.
 
+---
+
+## Get Started
+
+### 1. Download
+
+Grab the latest binary for your platform from [GitHub Releases](https://github.com/vinxv/tokenizer-cli/releases).
+
+```bash
+# Example: download and make executable (macOS / Linux)
+curl -L -o tokenizer-cli https://github.com/vinxv/tokenizer-cli/releases/latest/download/tokenizer-cli-$(uname -s)-$(uname -m)
+chmod +x tokenizer-cli
+```
+
+### 2. Pull a Model
+
+```bash
+# From HuggingFace (default)
+./tokenizer-cli pull Qwen/Qwen3-32B
+
+# From ModelScope
+./tokenizer-cli pull Qwen/Qwen2.5-0.5B-Instruct --source modelscope
+```
+
+### 3. Start the Service
+
+```bash
+./tokenizer-cli serve --enable-web
+```
+
+Open `http://localhost:8080` in your browser — you're done.
+
+> **Building from source?** See [Building from Source](#building-from-source).
+
+---
+
 ## Features
 
 - **Multi-Backend Support**: Integration with `fastokens` for BPE `tokenizer.json` files and `tiktoken-rs` for planned OpenAI support.
@@ -9,42 +45,7 @@ A high-performance, Rust-based microservice and CLI for LLM tokenization. It pro
 - **Unified CLI**: A single binary for serving the API, pulling models, and performing token operations.
 - **REST API**: Standardized endpoints for token counting, encoding, decoding, and model discovery.
 - **Web Dashboard**: An optional, built-in internal web interface for interactive debugging and testing.
-- **Prometheus Metrics**: Ready for production monitoring with built-in metrics.
 - **Lazy Loading & Caching**: Models are loaded on-demand and cached locally for efficiency.
-
----
-
-## Quick Start
-
-### 1. Installation
-
-Ensure you have Rust installed. Clone the repository and build:
-
-```bash
-cargo build --release
-```
-
-The binary will be available at `target/release/tokenizer-cli`.
-
-### 2. Pull a Model
-
-Download a tokenizer from HuggingFace (default) or ModelScope:
-
-```bash
-# Pull from HuggingFace
-./target/release/tokenizer-cli pull Qwen/Qwen3-32B
-
-# Pull from ModelScope
-./target/release/tokenizer-cli pull Qwen/Qwen2.5-0.5B-Instruct --source modelscope
-```
-
-### 3. Start the Service
-
-```bash
-./target/release/tokenizer-cli serve --enable-web
-```
-
-The service will start on `http://0.0.0.0:3000`. You can access the web dashboard at `http://localhost:3000`.
 
 ---
 
@@ -59,7 +60,7 @@ The service will start on `http://0.0.0.0:3000`. You can access the web dashboar
 | `models` | List all tokenizers currently available in the registry. |
 | `count <model> <text>` | Count tokens in the provided text. |
 | `encode <model> <text>` | Encode text into token IDs. |
-| `decode <model> <ids...>`| Decode token IDs back into text. |
+| `decode <model> <ids...>` | Decode token IDs back into text. |
 | `ping` | Health check for the service. |
 
 ---
@@ -68,6 +69,7 @@ The service will start on `http://0.0.0.0:3000`. You can access the web dashboar
 
 ### GET `/v1/models`
 Returns a list of all models discovered in the cache or loaded in memory.
+Each model includes `has_chat_template`, `chat_template_source`, and `chat_template_name`; the Web Dashboard uses them to show the Render tab only for models with a cached `chat_template` or `.jinja` template.
 
 ### POST `/v1/token/count`
 **Body**: `{"model": "gpt-4o", "text": "Hello world"}`
@@ -75,40 +77,103 @@ Returns a list of all models discovered in the cache or loaded in memory.
 
 ### POST `/v1/token/encode`
 **Body**: `{"model": "Qwen/Qwen3-32B", "text": "Hello world"}`
-**Response**: `{"model": "Qwen/Qwen3-32B", "ids": [9707, 1879]}`
+**Response**: `{"model": "Qwen/Qwen3-32B", "ids": [9707, 1879], "tokens": ["Hello", " world"]}`
 
 ### POST `/v1/token/decode`
 **Body**: `{"model": "Qwen/Qwen3-32B", "ids": [9707, 1879]}`
 **Response**: `{"model": "Qwen/Qwen3-32B", "text": "Hello world"}`
 
-### GET `/metrics`
-Exposes Prometheus-formatted metrics.
+### POST `/v1/chat/render`
+Renders Chat Completions-style `messages` to raw prompt text and returns its token count.
+Extra JSON fields in the request body are passed through as Jinja template variables.
+
+Template resolution:
+1. `chat_template` is read from cached `tokenizer_config.json`.
+2. Otherwise, a cached `.jinja` template file such as `chat_template.jinja` is used.
+3. If none exists, the request returns `INVALID_INPUT`.
+
+**Body**: `{"model": "Qwen/Qwen3-32B", "messages": [{"role": "user", "content": "Hello"}], "add_generation_prompt": true}`
+**Response**: `{"model": "Qwen/Qwen3-32B", "text": "...", "count": 42, "template_source": "jinja_file", "template_name": "chat_template.jinja"}`
 
 ---
 
 ## Configuration
 
-The service can be configured via `config.yaml`, environment variables, or CLI flags. See `config.example.yaml` for a full reference.
+Configuration is loaded from three layers in order of precedence:
+**CLI flags > environment variables > `config.yaml` > defaults**.
 
-Key environment variables:
-- `TOKSVC_HOST`: Interface to bind to (default: `0.0.0.0`).
-- `TOKSVC_PORT`: Port to listen on (default: `3000`).
-- `TOKSVC_CACHE_DIR`: Directory for model storage (default: `~/.cache/huggingface`).
-- `HF_TOKEN`: HuggingFace API token for private models.
-- `TOKSVC_MS_TOKEN`: ModelScope SDK token.
+### config.yaml
+
+Create a `config.yaml` in the project root (see `config.example.yaml` for a template):
+
+| Field | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `host` | string | `0.0.0.0` | Interface to bind the HTTP server on |
+| `port` | u16 | `8080` | Port to listen on |
+| `cache_dir` | string | `~/.cache/tokenizer-svc` | Local cache directory for downloaded model files |
+| `model_source` | string | `huggingface` | Model hub: `huggingface` or `modelscope` |
+| `hf_token` | string? | — | HuggingFace API token (for gated / private models) |
+| `ms_token` | string? | — | ModelScope SDK token (for gated / private models) |
+| `allow_online_download` | bool | `true` | If `false`, models must be pre-cached; on-demand download is disabled |
+
+### Environment Variables
+
+All config fields can be overridden with `TOKSVC_`-prefixed environment variables:
+
+| Variable | Maps to |
+| :--- | :--- |
+| `TOKSVC_HOST` | `host` |
+| `TOKSVC_PORT` | `port` |
+| `TOKSVC_CACHE_DIR` | `cache_dir` |
+| `TOKSVC_MODEL_SOURCE` | `model_source` |
+| `TOKSVC_HF_TOKEN` | `hf_token` |
+| `TOKSVC_MS_TOKEN` | `ms_token` |
+| `TOKSVC_ALLOW_ONLINE_DOWNLOAD` | `allow_online_download` |
+
+### CLI Flags
+
+| Flag | Command | Description |
+| :--- | :--- | :--- |
+| `--json` | global | Emit JSON output matching the HTTP API response shape |
+| `--log-level` | global | Log level: `error` / `warn` / `info` / `debug` / `trace` (default: `info`) |
+| `--enable-web` | `serve` | Enable the embedded Web Dashboard on `/` |
+| `--source` | `pull` | Model hub: `huggingface` or `modelscope` |
+| `--token` | `pull` | HuggingFace API token (overrides env / config) |
+| `--ms-token` | `pull` | ModelScope SDK token (overrides env / config) |
+
+### Example
+
+```yaml
+# config.yaml
+host: "127.0.0.1"
+port: 9090
+cache_dir: "/data/tokenizer-cache"
+model_source: "modelscope"
+hf_token: "hf_your_token_here"
+allow_online_download: false
+```
+
+```bash
+# env overrides port 9090 → 3000
+TOKSVC_PORT=3000 ./tokenizer-cli serve --enable-web
+```
 
 ---
 
-## Development
+## Building from Source
 
-### Requirements
-- Rust 1.75+
-- `libssl` (for `reqwest` and `hf-hub`)
+Requires [Rust](https://rustup.rs). Clone the repository and build:
 
-### Running Tests
 ```bash
-cargo test
+git clone https://github.com/vinxv/tokenizer-cli.git
+cd tokenizer-cli
+cargo build --release
 ```
 
-### Building for Multiple Platforms
-The project uses GitHub Actions to build binaries for Linux (glibc/musl) and macOS across x86_64 and arm64 architectures. Check `.github/workflows/build.yml` for details.
+The binary will be at `target/release/tokenizer-cli`.
+
+---
+
+## Documentation
+
+- [中文文档](README.zh-CN.md)

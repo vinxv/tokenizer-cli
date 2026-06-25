@@ -1,3 +1,4 @@
+pub mod chat_template;
 /// Public library surface for `tokenizer-svc`.
 ///
 /// Integration tests import this crate directly; the `[[bin]]` target
@@ -5,7 +6,7 @@
 pub mod config;
 pub mod error;
 pub mod handlers;
-pub mod metrics;
+
 pub mod routes;
 pub mod state;
 pub mod tokenizer;

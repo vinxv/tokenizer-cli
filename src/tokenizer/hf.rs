@@ -30,6 +30,7 @@ use super::{TokenizerBackend, TokenizerBackendKind, TokenizerInfo};
 pub const TOKENIZER_FILES: &[(&str, bool)] = &[
     ("tokenizer.json", true),
     ("tokenizer_config.json", false),
+    ("chat_template.jinja", false),
     ("special_tokens_map.json", false),
     ("vocab.json", false),
     ("merges.txt", false),
@@ -262,5 +263,21 @@ impl TokenizerBackend for HfTokenizer {
         })
         .await
         .map_err(|e| AppError::TokenizerError(format!("join error in decode: {e}")))?
+    }
+
+    async fn token_texts(&self, ids: &[u32]) -> AppResult<Vec<String>> {
+        let inner = self.inner.clone();
+        let ids = ids.to_vec();
+        let model_id = self.model_id.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let singletons: Vec<[u32; 1]> = ids.into_iter().map(|id| [id]).collect();
+            let slices: Vec<&[u32]> = singletons.iter().map(|ids| ids.as_slice()).collect();
+            inner.decode_batch(&slices, false).map_err(|e| {
+                AppError::TokenizerError(format!("[{model_id}] token decode failed: {e}"))
+            })
+        })
+        .await
+        .map_err(|e| AppError::TokenizerError(format!("join error in token decode: {e}")))?
     }
 }

@@ -2,7 +2,7 @@
 use axum::{extract::State, Json};
 use serde::Serialize;
 
-use crate::{error::AppResult, state::AppState};
+use crate::{chat_template::ChatTemplateSource, error::AppResult, state::AppState};
 
 #[derive(Debug, Serialize)]
 pub struct ModelEntry {
@@ -11,6 +11,11 @@ pub struct ModelEntry {
     pub vocab_size: Option<usize>,
     pub backend: String,
     pub status: String,
+    pub has_chat_template: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_template_source: Option<ChatTemplateSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_template_name: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -29,6 +34,9 @@ pub async fn list_models(State(state): State<AppState>) -> AppResult<Json<Models
             vocab_size: info.vocab_size,
             backend: info.backend,
             status: info.status,
+            has_chat_template: info.has_chat_template,
+            chat_template_source: info.chat_template_source,
+            chat_template_name: info.chat_template_name,
         })
         .collect();
 

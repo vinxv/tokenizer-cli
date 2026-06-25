@@ -26,6 +26,7 @@ pub struct TestServer {
 /// - `HF_TOKEN`               — HuggingFace bearer token
 /// - `TOKSVC_MS_TOKEN`        — ModelScope SDK token (`m_session_id` cookie)
 /// - `TOKSVC_MODEL_SOURCE`    — `huggingface` (default) or `modelscope`
+#[allow(dead_code)]
 pub async fn spawn_server() -> TestServer {
     let model_source = std::env::var("TOKSVC_MODEL_SOURCE")
         .ok()
@@ -60,6 +61,10 @@ pub async fn spawn_server() -> TestServer {
     }
     let _ = std::fs::create_dir_all(&cfg.cache_dir);
 
+    spawn_server_with_config(cfg).await
+}
+
+pub async fn spawn_server_with_config(cfg: Config) -> TestServer {
     let state = AppState::new(&cfg).await.expect("AppState::new failed");
     let app = build_router(state, false);
 

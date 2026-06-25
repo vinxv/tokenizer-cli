@@ -64,7 +64,7 @@ async fn encode_unknown_model_returns_404() {
     assert_eq!(res.status(), 404);
 }
 
-/// Successful encode must return `model` + `ids` array.
+/// Successful encode must return `model` + `ids` array + token text array.
 #[tokio::test]
 #[ignore = "Requires a real backend to be implemented (Phase 1)"]
 async fn encode_response_shape() {
@@ -81,6 +81,7 @@ async fn encode_response_shape() {
     let body: serde_json::Value = res.json().await.expect("json parse");
     assert!(body["model"].is_string());
     assert!(body["ids"].is_array());
+    assert!(body["tokens"].is_array());
     assert!(!body["ids"].as_array().unwrap().is_empty());
 }
 

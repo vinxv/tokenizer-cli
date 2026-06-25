@@ -158,6 +158,11 @@
                 border-bottom-color: var(--accent);
             }
 
+            .tab[hidden],
+            .panel[hidden] {
+                display: none !important;
+            }
+
             .panel {
                 display: none;
                 background: var(--bg-panel);
@@ -367,6 +372,104 @@
                 width: 100%;
             }
 
+            .section-label {
+                width: 100%;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    "Helvetica Neue", Arial, sans-serif;
+                font-size: 0.72rem;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                margin-top: 0.75rem;
+            }
+
+            .rendered-code {
+                display: block;
+                width: 100%;
+                white-space: pre-wrap;
+                word-break: break-word;
+                color: var(--text-main);
+                background-color: rgba(244, 244, 245, 0.04);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                padding: 1rem;
+                line-height: 1.65;
+            }
+
+            .token-table-wrapper {
+                width: 100%;
+                overflow: auto;
+                max-height: 360px;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                background-color: rgba(244, 244, 245, 0.02);
+                contain: content;
+            }
+
+            .token-table {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed;
+                color: var(--text-main);
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
+                font-size: 0.82rem;
+            }
+
+            .token-table th,
+            .token-table td {
+                padding: 0.55rem 0.75rem;
+                border-bottom: 1px solid var(--border);
+                text-align: left;
+                white-space: nowrap;
+                height: 36px;
+                line-height: 1.25;
+            }
+
+            .token-table th {
+                position: sticky;
+                top: 0;
+                background-color: var(--bg-card);
+                color: var(--text-muted);
+                font-size: 0.68rem;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+
+            .token-table tr:last-child td {
+                border-bottom: none;
+            }
+
+            .token-table-index {
+                color: var(--text-muted);
+                width: 6rem;
+            }
+
+            .token-table-id {
+                width: 8rem;
+            }
+
+            .token-table-text {
+                white-space: pre;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .token-table-empty {
+                color: var(--text-muted);
+                font-style: italic;
+            }
+
+            .token-table-spacer td {
+                padding: 0;
+                border-bottom: none;
+                height: 0;
+            }
+
             .error-message {
                 width: 100%;
             }
@@ -452,6 +555,36 @@
                         Decode
                     </button>
                     <button class="tab" data-target="count-panel">Count</button>
+                    <button
+                        id="render-tab"
+                        class="tab"
+                        data-target="render-panel"
+                        hidden
+                    >
+                        Render
+                    </button>
+                </div>
+
+                <!-- Render Panel -->
+                <div id="render-panel" class="panel" hidden>
+                    <div class="control-group" style="width: 100%">
+                        <label for="render-input">Chat Completions Input</label>
+                        <textarea
+                            id="render-input"
+                            placeholder='{"messages":[{"role":"user","content":"Hello"}]}'
+                            style="
+                                font-family:
+                                    ui-monospace, SFMono-Regular, Menlo, Monaco,
+                                    Consolas, monospace;
+                            "
+                        ></textarea>
+                    </div>
+                    <button class="action" onclick="handleRender()">
+                        Render
+                    </button>
+                    <div class="result-box" id="render-result">
+                        Results will appear here.
+                    </div>
                 </div>
 
                 <!-- Encode Panel -->
@@ -515,6 +648,7 @@
         <script>
             // --- State ---
             let currentModel = "";
+            let modelsById = new Map();
 
             // --- Init ---
             async function fetchModels() {
@@ -525,9 +659,11 @@
 
                     const select = document.getElementById("modelSelect");
                     select.innerHTML = "";
+                    modelsById = new Map();
 
                     if (data.models && data.models.length > 0) {
                         data.models.forEach((m) => {
+                            modelsById.set(m.model_id, m);
                             const opt = document.createElement("option");
                             opt.value = m.model_id;
                             opt.textContent = `${m.model_id}`;
@@ -537,11 +673,16 @@
                     } else {
                         select.innerHTML =
                             '<option value="">No models loaded</option>';
+                        currentModel = "";
                     }
+                    updateRenderTabVisibility();
                 } catch (err) {
                     console.error(err);
+                    modelsById = new Map();
+                    currentModel = "";
                     document.getElementById("modelSelect").innerHTML =
                         `<option value="">Error loading models. Ensure service is running.</option>`;
+                    updateRenderTabVisibility();
                 }
             }
 
@@ -549,22 +690,54 @@
                 .getElementById("modelSelect")
                 .addEventListener("change", (e) => {
                     currentModel = e.target.value;
+                    updateRenderTabVisibility();
                 });
 
             // --- Tabs ---
+            function activatePanel(target) {
+                document
+                    .querySelectorAll(".tab")
+                    .forEach((t) => t.classList.remove("active"));
+                document
+                    .querySelectorAll(".panel")
+                    .forEach((p) => p.classList.remove("active"));
+
+                const tab = document.querySelector(
+                    `.tab[data-target="${target}"]`,
+                );
+                const panel = document.getElementById(target);
+
+                if (!tab || !panel || tab.hidden || panel.hidden) return;
+
+                tab.classList.add("active");
+                panel.classList.add("active");
+            }
+
+            function selectedModelInfo() {
+                return modelsById.get(currentModel);
+            }
+
+            function updateRenderTabVisibility() {
+                const model = selectedModelInfo();
+                const canRender = Boolean(model && model.has_chat_template);
+                const renderTab = document.getElementById("render-tab");
+                const renderPanel = document.getElementById("render-panel");
+
+                renderTab.hidden = !canRender;
+                renderPanel.hidden = !canRender;
+
+                if (
+                    !canRender &&
+                    (renderTab.classList.contains("active") ||
+                        renderPanel.classList.contains("active"))
+                ) {
+                    activatePanel("encode-panel");
+                }
+            }
+
             document.querySelectorAll(".tab").forEach((tab) => {
                 tab.addEventListener("click", () => {
-                    document
-                        .querySelectorAll(".tab")
-                        .forEach((t) => t.classList.remove("active"));
-                    document
-                        .querySelectorAll(".panel")
-                        .forEach((p) => p.classList.remove("active"));
-
-                    tab.classList.add("active");
-                    document
-                        .getElementById(tab.dataset.target)
-                        .classList.add("active");
+                    activatePanel(tab.dataset.target);
                 });
             });
 
@@ -636,6 +809,16 @@
                     }
                     throw err;
                 }
+            }
+
+            function apiErrorMessage(data, fallback) {
+                if (data && data.error) {
+                    if (typeof data.error === "string") return data.error;
+                    if (typeof data.error.message === "string") {
+                        return data.error.message;
+                    }
+                }
+                return fallback;
             }
 
             function renderError(containerId, err, elapsedMs) {
@@ -763,6 +946,327 @@
                 el.appendChild(content);
             }
 
+            function parseChatCompletionsInput(raw) {
+                const trimmed = raw.trim();
+                if (!trimmed) {
+                    throw new Error("Please enter chat completions JSON.");
+                }
+
+                let parsed;
+                try {
+                    parsed = JSON.parse(trimmed);
+                } catch (err) {
+                    throw new Error(`Invalid JSON: ${err.message}`);
+                }
+
+                if (Array.isArray(parsed)) {
+                    return { messages: parsed };
+                }
+
+                if (!parsed || typeof parsed !== "object") {
+                    throw new Error(
+                        "Chat completions input must be an object or message array.",
+                    );
+                }
+
+                if (!Array.isArray(parsed.messages)) {
+                    throw new Error("Chat completions input must include messages.");
+                }
+
+                return parsed;
+            }
+
+            function formatTemplateSource(source) {
+                if (source === "tokenizer_config") return "tokenizer_config";
+                if (source === "jinja_file") return "jinja_file";
+                return source || "unknown";
+            }
+
+            function formatTemplateName(renderData) {
+                return (
+                    renderData.template_name ||
+                    formatTemplateSource(renderData.template_source)
+                );
+            }
+
+            const TOKEN_TABLE_ROW_HEIGHT = 36;
+            const TOKEN_TABLE_BUFFER_ROWS = 12;
+
+            function displayTokenText(text) {
+                if (text === "") {
+                    return { value: "(empty)", empty: true };
+                }
+                if (/^\s+$/.test(text)) {
+                    return { value: JSON.stringify(text), empty: false };
+                }
+                return { value: text, empty: false };
+            }
+
+            function appendTokenTableSpacer(tbody, rowCount) {
+                if (rowCount <= 0) return;
+
+                const row = document.createElement("tr");
+                row.className = "token-table-spacer";
+
+                const cell = document.createElement("td");
+                cell.colSpan = 3;
+                cell.style.height = `${rowCount * TOKEN_TABLE_ROW_HEIGHT}px`;
+
+                row.appendChild(cell);
+                tbody.appendChild(row);
+            }
+
+            function appendTokenTableRow(tbody, ids, tokens, index) {
+                const row = document.createElement("tr");
+
+                const indexCell = document.createElement("td");
+                indexCell.className = "token-table-index";
+                indexCell.textContent = `${index}`;
+
+                const idCell = document.createElement("td");
+                idCell.className = "token-table-id";
+                idCell.textContent = `${ids[index]}`;
+
+                const textCell = document.createElement("td");
+                const tokenText =
+                    typeof tokens[index] === "string" ? tokens[index] : "";
+                const display = displayTokenText(tokenText);
+                textCell.className = "token-table-text";
+                if (display.empty) textCell.classList.add("token-table-empty");
+                textCell.textContent = display.value;
+                textCell.title = tokenText;
+
+                row.appendChild(indexCell);
+                row.appendChild(idCell);
+                row.appendChild(textCell);
+                tbody.appendChild(row);
+            }
+
+            function renderTokenTable(ids, tokens = []) {
+                const wrapper = document.createElement("div");
+                wrapper.className = "token-table-wrapper";
+
+                const table = document.createElement("table");
+                table.className = "token-table";
+
+                const colgroup = document.createElement("colgroup");
+                ["6rem", "8rem", "auto"].forEach((width) => {
+                    const col = document.createElement("col");
+                    col.style.width = width;
+                    colgroup.appendChild(col);
+                });
+
+                const thead = document.createElement("thead");
+                const headerRow = document.createElement("tr");
+                ["Index", "Token ID", "Text"].forEach((label) => {
+                    const th = document.createElement("th");
+                    th.textContent = label;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+
+                const tbody = document.createElement("tbody");
+                let renderedStart = -1;
+                let renderedEnd = -1;
+                let pendingFrame = 0;
+
+                function renderVisibleRows() {
+                    pendingFrame = 0;
+                    const total = ids.length;
+                    const viewportHeight =
+                        wrapper.clientHeight || TOKEN_TABLE_ROW_HEIGHT * 10;
+                    const viewportRows = Math.ceil(
+                        viewportHeight / TOKEN_TABLE_ROW_HEIGHT,
+                    );
+                    const start = Math.max(
+                        0,
+                        Math.floor(wrapper.scrollTop / TOKEN_TABLE_ROW_HEIGHT) -
+                            TOKEN_TABLE_BUFFER_ROWS,
+                    );
+                    const end = Math.min(
+                        total,
+                        start + viewportRows + TOKEN_TABLE_BUFFER_ROWS * 2,
+                    );
+
+                    if (start === renderedStart && end === renderedEnd) return;
+                    renderedStart = start;
+                    renderedEnd = end;
+
+                    tbody.replaceChildren();
+                    appendTokenTableSpacer(tbody, start);
+                    for (let index = start; index < end; index += 1) {
+                        appendTokenTableRow(tbody, ids, tokens, index);
+                    }
+                    appendTokenTableSpacer(tbody, total - end);
+                }
+
+                wrapper.addEventListener(
+                    "scroll",
+                    () => {
+                        if (pendingFrame) return;
+                        pendingFrame = requestAnimationFrame(renderVisibleRows);
+                    },
+                    { passive: true },
+                );
+
+                table.appendChild(colgroup);
+                table.appendChild(thead);
+                table.appendChild(tbody);
+                wrapper.appendChild(table);
+                renderVisibleRows();
+                requestAnimationFrame(renderVisibleRows);
+                return wrapper;
+            }
+
+            function renderChatResult(
+                renderData,
+                ids,
+                tokens,
+                renderElapsedMs,
+                encodeElapsedMs,
+            ) {
+                const el = document.getElementById("render-result");
+                el.className = "result-box success";
+                el.innerHTML = "";
+
+                const header = document.createElement("div");
+                header.className = "result-header";
+
+                const headerInfo = document.createElement("div");
+                headerInfo.className = "result-header-info";
+
+                const countLabel = document.createElement("span");
+                countLabel.className = "token-count-label";
+                countLabel.textContent = "Token Count";
+
+                const countInfo = document.createElement("span");
+                countInfo.className = "token-count";
+                countInfo.textContent = `${renderData.count}`;
+
+                headerInfo.appendChild(countLabel);
+                headerInfo.appendChild(countInfo);
+                headerInfo.appendChild(
+                    createMetaRow([
+                        {
+                            label: "Template",
+                            value: formatTemplateName(renderData),
+                        },
+                        {
+                            label: "Render",
+                            value: formatElapsedMs(renderElapsedMs),
+                        },
+                        {
+                            label: "Encode",
+                            value: formatElapsedMs(encodeElapsedMs),
+                        },
+                    ]),
+                );
+
+                const copyBtn = document.createElement("button");
+                copyBtn.className = "copy-btn";
+                copyBtn.textContent = "Copy";
+                copyBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    navigator.clipboard
+                        .writeText(renderData.text)
+                        .then(() => {
+                            const originalText = copyBtn.textContent;
+                            copyBtn.textContent = "Copied!";
+                            copyBtn.classList.add("copied");
+                            setTimeout(() => {
+                                copyBtn.textContent = originalText;
+                                copyBtn.classList.remove("copied");
+                            }, 2000);
+                        })
+                        .catch(() => {
+                            alert("Failed to copy");
+                        });
+                };
+
+                header.appendChild(headerInfo);
+                header.appendChild(copyBtn);
+                el.appendChild(header);
+
+                const textLabel = document.createElement("div");
+                textLabel.className = "section-label";
+                textLabel.textContent = "Rendered Text";
+                el.appendChild(textLabel);
+
+                const renderedText = document.createElement("code");
+                renderedText.className = "rendered-code";
+                renderedText.textContent = renderData.text;
+                el.appendChild(renderedText);
+
+                const tableLabel = document.createElement("div");
+                tableLabel.className = "section-label";
+                tableLabel.textContent = "Token List";
+                el.appendChild(tableLabel);
+                el.appendChild(renderTokenTable(ids, tokens));
+            }
+
+            async function handleRender() {
+                if (!currentModel || !selectedModelInfo()?.has_chat_template) return;
+
+                let payload;
+                try {
+                    payload = parseChatCompletionsInput(
+                        document.getElementById("render-input").value,
+                    );
+                } catch (err) {
+                    return renderError("render-result", err);
+                }
+
+                renderLoading("render-result");
+                try {
+                    const { res, data, elapsedMs } = await timedJsonFetch(
+                        "/v1/chat/render",
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                ...payload,
+                                model: currentModel,
+                            }),
+                        },
+                    );
+
+                    if (!res.ok) {
+                        const err = new Error(
+                            apiErrorMessage(data, "Render failed"),
+                        );
+                        err.elapsedMs = elapsedMs;
+                        throw err;
+                    }
+
+                    const encoded = await timedJsonFetch("/v1/token/encode", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            model: currentModel,
+                            text: data.text,
+                        }),
+                    });
+
+                    if (!encoded.res.ok) {
+                        const err = new Error(
+                            apiErrorMessage(encoded.data, "Encode failed"),
+                        );
+                        err.elapsedMs = elapsedMs + encoded.elapsedMs;
+                        throw err;
+                    }
+
+                    renderChatResult(
+                        data,
+                        encoded.data.ids,
+                        encoded.data.tokens || [],
+                        elapsedMs,
+                        encoded.elapsedMs,
+                    );
+                } catch (err) {
+                    renderError("render-result", err, err.elapsedMs);
+                }
+            }
+
             async function handleEncode() {
                 const text = document.getElementById("encode-input").value;
                 if (!text || !currentModel) return;
@@ -778,7 +1282,9 @@
                         },
                     );
                     if (!res.ok) {
-                        const err = new Error(data.error || "Encode failed");
+                        const err = new Error(
+                            apiErrorMessage(data, "Encode failed"),
+                        );
                         err.elapsedMs = elapsedMs;
                         throw err;
                     }
@@ -836,18 +1342,11 @@
                     header.appendChild(copyBtn);
                     el.appendChild(header);
 
-                    // Token chips container
-                    const chipsContainer = document.createElement("div");
-                    chipsContainer.className = "token-list";
-
-                    data.ids.forEach((id) => {
-                        const span = document.createElement("span");
-                        span.className = "token-chip";
-                        span.textContent = id;
-                        chipsContainer.appendChild(span);
-                    });
-
-                    el.appendChild(chipsContainer);
+                    const tableLabel = document.createElement("div");
+                    tableLabel.className = "section-label";
+                    tableLabel.textContent = "Token List";
+                    el.appendChild(tableLabel);
+                    el.appendChild(renderTokenTable(data.ids, data.tokens || []));
                 } catch (err) {
                     renderError("encode-result", err, err.elapsedMs);
                 }
@@ -882,7 +1381,9 @@
                     );
 
                     if (!res.ok) {
-                        const err = new Error(data.error || "Decode failed");
+                        const err = new Error(
+                            apiErrorMessage(data, "Decode failed"),
+                        );
                         err.elapsedMs = elapsedMs;
                         throw err;
                     }
@@ -909,7 +1410,9 @@
                     );
 
                     if (!res.ok) {
-                        const err = new Error(data.error || "Count failed");
+                        const err = new Error(
+                            apiErrorMessage(data, "Count failed"),
+                        );
                         err.elapsedMs = elapsedMs;
                         throw err;
                     }

@@ -16,14 +16,19 @@ use tokio::sync::{Mutex, OnceCell};
 use tracing::{info, warn};
 
 use crate::{
+    chat_template::{find_cached_template, ChatTemplateSource, ResolvedChatTemplate},
     config::{Config, ModelSource},
     error::{AppError, AppResult},
 };
 
-use super::{hf::HfTokenizer, ms, TokenizerBackend, TokenizerBackendKind};
+use super::{
+    hf::{self, HfTokenizer},
+    ms, TokenizerBackend, TokenizerBackendKind,
+};
 
 /// Shared, lazily-initialised slot for one model's load task.
 type LoadSlot = Arc<OnceCell<Arc<dyn TokenizerBackend>>>;
+type ChatTemplateCacheEntry = (ChatTemplateSource, Option<String>);
 
 pub struct RegistryModelInfo {
     pub model_id: String,
@@ -31,6 +36,9 @@ pub struct RegistryModelInfo {
     pub vocab_size: Option<usize>,
     pub status: String,
     pub source: String,
+    pub has_chat_template: bool,
+    pub chat_template_source: Option<ChatTemplateSource>,
+    pub chat_template_name: Option<String>,
 }
 
 /// Thread-safe, shared tokenizer registry.
@@ -44,6 +52,9 @@ pub struct Registry {
 
     /// Inflight / pending load slots — prevents duplicate concurrent downloads.
     inflight: Arc<Mutex<HashMap<String, LoadSlot>>>,
+
+    /// Cached chat-template availability discovered from local model files.
+    chat_templates: Arc<DashMap<String, ChatTemplateCacheEntry>>,
 
     cache_dir: String,
     hf_token: Option<String>,
@@ -59,6 +70,7 @@ impl Registry {
             loaded: Arc::new(DashMap::new()),
             scanned: Arc::new(DashMap::new()),
             inflight: Arc::new(Mutex::new(HashMap::new())),
+            chat_templates: Arc::new(DashMap::new()),
             cache_dir: cfg.cache_dir.clone(),
             hf_token: cfg.hf_token.clone(),
             allow_online: cfg.allow_online_download,
@@ -87,6 +99,7 @@ impl Registry {
                                 model_id.clone(),
                                 (TokenizerBackendKind::HuggingFace, "huggingface".to_string()),
                             );
+                            self.refresh_cached_chat_template(&model_id);
                             tracing::info!("Scanned model from cache: '{model_id}'");
                         } else if let Some(rest) = name.strip_prefix("ms--") {
                             let model_id = if let Some((org, repo)) = rest.split_once("--") {
@@ -98,6 +111,7 @@ impl Registry {
                                 model_id.clone(),
                                 (TokenizerBackendKind::HuggingFace, "modelscope".to_string()),
                             );
+                            self.refresh_cached_chat_template(&model_id);
                             tracing::info!("Scanned ModelScope model from cache: '{model_id}'");
                         }
                     }
@@ -121,6 +135,9 @@ impl Registry {
                     vocab_size: None,
                     status: "scanned".to_string(),
                     source: source.clone(),
+                    has_chat_template: false,
+                    chat_template_source: None,
+                    chat_template_name: None,
                 },
             );
         }
@@ -145,13 +162,62 @@ impl Registry {
                     vocab_size: Some(info.vocab_size),
                     status: "loaded".to_string(),
                     source,
+                    has_chat_template: false,
+                    chat_template_source: None,
+                    chat_template_name: None,
                 },
             );
         }
 
         let mut list: Vec<_> = results.into_values().collect();
+        for info in &mut list {
+            if let Some(template) = self.chat_templates.get(&info.model_id) {
+                let (source, name) = template.value().clone();
+                info.has_chat_template = true;
+                info.chat_template_source = Some(source);
+                info.chat_template_name = name;
+            }
+        }
         list.sort_by(|a, b| a.model_id.cmp(&b.model_id));
         list
+    }
+
+    /// Resolve a model's chat template from cached or downloadable
+    /// `tokenizer_config.json`.
+    pub async fn chat_template_for_model(
+        &self,
+        model_id: &str,
+    ) -> AppResult<Option<ResolvedChatTemplate>> {
+        if let Some(template) = find_cached_template(&self.cache_dir, model_id)? {
+            self.chat_templates.insert(
+                model_id.to_string(),
+                (template.source, template.source_name.clone()),
+            );
+            return Ok(Some(template));
+        }
+
+        if !self.allow_online {
+            return Ok(None);
+        }
+
+        let model_source = self.source_for_model(model_id);
+        match model_source {
+            ModelSource::HuggingFace => {
+                hf::pull(model_id, &self.cache_dir, self.hf_token.as_deref()).await?
+            }
+            ModelSource::ModelScope => {
+                ms::pull(model_id, &self.cache_dir, self.ms_token.as_deref()).await?
+            }
+        };
+
+        let template = find_cached_template(&self.cache_dir, model_id)?;
+        if let Some(template) = &template {
+            self.chat_templates.insert(
+                model_id.to_string(),
+                (template.source, template.source_name.clone()),
+            );
+        }
+        Ok(template)
     }
 
     /// Retrieve a tokenizer by model id, loading it if necessary.
@@ -182,12 +248,7 @@ impl Registry {
         let hf_token = self.hf_token.clone();
         let ms_token = self.ms_token.clone();
 
-        let cached_source = self.scanned.get(model_id).map(|s| s.value().1.clone());
-        let model_source = match cached_source.as_deref() {
-            Some("modelscope") => ModelSource::ModelScope,
-            Some("huggingface") => ModelSource::HuggingFace,
-            _ => self.model_source.clone(),
-        };
+        let model_source = self.source_for_model(model_id);
 
         // Capture a label for the log line *before* the closure moves model_source.
         let source_label = format!("{model_source:?}");
@@ -215,8 +276,33 @@ impl Registry {
             .expect("OnceCell must be set after get_or_try_init")
             .clone();
         self.loaded.insert(model_id.to_string(), arc.clone());
+        self.refresh_cached_chat_template(model_id);
         info!("Cached tokenizer for '{model_id}' (source={source_label})");
 
         Ok(arc)
+    }
+
+    fn source_for_model(&self, model_id: &str) -> ModelSource {
+        let cached_source = self.scanned.get(model_id).map(|s| s.value().1.clone());
+        match cached_source.as_deref() {
+            Some("modelscope") => ModelSource::ModelScope,
+            Some("huggingface") => ModelSource::HuggingFace,
+            _ => self.model_source.clone(),
+        }
+    }
+
+    fn refresh_cached_chat_template(&self, model_id: &str) {
+        match find_cached_template(&self.cache_dir, model_id) {
+            Ok(Some(template)) => {
+                self.chat_templates.insert(
+                    model_id.to_string(),
+                    (template.source, template.source_name),
+                );
+            }
+            Ok(None) => {
+                self.chat_templates.remove(model_id);
+            }
+            Err(err) => warn!("Failed to inspect chat template for '{model_id}': {err}"),
+        }
     }
 }
