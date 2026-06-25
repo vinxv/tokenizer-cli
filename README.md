@@ -14,7 +14,7 @@ Grab the latest binary for your platform from [GitHub Releases](https://github.c
 
 ```bash
 # Example: download and make executable (macOS / Linux)
-curl -L -o tokenizer-cli https://github.com/vinxv/tokenizer-cli/releases/latest/download/tokenizer-cli-$(uname -s)-$(uname -m)
+curl -fsSL -o tokenizer-cli https://github.com/vinxv/tokenizer-cli/releases/latest/download/tokenizer-cli-$(uname -s)-$(uname -m)
 chmod +x tokenizer-cli
 ```
 
@@ -45,7 +45,7 @@ Open `http://localhost:8080` in your browser — you're done.
 - **Multi-Backend Support**: Integration with `fastokens` for BPE `tokenizer.json` files and `tiktoken-rs` for planned OpenAI support.
 - **Multi-Hub Model Pulling**: Seamlessly download models from **HuggingFace Hub** and **ModelScope**.
 - **Unified CLI**: A single binary for serving the API, pulling models, and performing token operations.
-- **REST API**: Standardized endpoints for token counting, encoding, decoding, and model discovery.
+- **HTTP API**: Standardized endpoints for token counting, encoding, decoding, and model discovery.
 - **Web Dashboard**: An optional, built-in internal web interface for interactive debugging and testing.
 - **Lazy Loading & Caching**: Models are loaded on-demand and cached locally for efficiency.
 
@@ -63,11 +63,12 @@ Open `http://localhost:8080` in your browser — you're done.
 | `count <model> <text>` | Count tokens in the provided text. |
 | `encode <model> <text>` | Encode text into token IDs. |
 | `decode <model> <ids...>` | Decode token IDs back into text. |
+| `--help` | Print full help information. |
 | `ping` | Health check for the service. |
 
 ---
 
-## API Reference
+## HTTP API
 
 ### GET `/v1/models`
 Returns a list of all models discovered in the cache or loaded in memory.
@@ -173,5 +174,3 @@ cargo build --release
 ```
 
 The binary will be at `target/release/tokenizer-cli`.
-
----

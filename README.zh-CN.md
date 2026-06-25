@@ -14,7 +14,7 @@
 
 ```bash
 # macOS / Linux 示例：下载并赋予执行权限
-curl -L -o tokenizer-cli https://github.com/vinxv/tokenizer-cli/releases/latest/download/tokenizer-cli-$(uname -s)-$(uname -m)
+curl -fsSL -o tokenizer-cli https://github.com/vinxv/tokenizer-cli/releases/latest/download/tokenizer-cli-$(uname -s)-$(uname -m)
 chmod +x tokenizer-cli
 ```
 
@@ -45,7 +45,7 @@ chmod +x tokenizer-cli
 - **多后端支持**：集成 `fastokens`（BPE `tokenizer.json`）与 `tiktoken-rs`（OpenAI 计划中）。
 - **多 Hub 模型拉取**：支持从 **HuggingFace Hub** 和 **ModelScope** 下载模型。
 - **统一 CLI**：单个二进制文件，可启动服务、拉取模型、执行 Token 操作。
-- **REST API**：标准化的 token 计数、编码、解码与模型发现接口。
+- **HTTP API**：标准化的 token 计数、编码、解码与模型发现接口。
 - **Web 控制台**：可选的嵌入式 Web 调试界面。
 - **懒加载与缓存**：模型按需加载，本地缓存复用。
 
@@ -63,11 +63,12 @@ chmod +x tokenizer-cli
 | `count <model> <text>` | 统计指定文本的 token 数 |
 | `encode <model> <text>` | 将文本编码为 token ID |
 | `decode <model> <ids...>` | 将 token ID 解码为文本 |
+| `--help` | 打印完整帮助信息 |
 | `ping` | 服务健康检查 |
 
 ---
 
-## API 参考
+## HTTP API
 
 ### GET `/v1/models`
 返回缓存或已加载的全部模型列表。
