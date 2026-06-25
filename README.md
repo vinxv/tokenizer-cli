@@ -2,6 +2,8 @@
 
 A high-performance, Rust-based microservice and CLI for LLM tokenization. It provides a unified interface for HuggingFace, ModelScope, and OpenAI (tiktoken) tokenizers.
 
+> [中文文档](README.zh-CN.md)
+
 ---
 
 ## Get Started
@@ -173,7 +175,3 @@ cargo build --release
 The binary will be at `target/release/tokenizer-cli`.
 
 ---
-
-## Documentation
-
-- [中文文档](README.zh-CN.md)
