@@ -298,7 +298,7 @@ fn jinja_template_candidates(cache_dir: &str, model_id: &str) -> Vec<PathBuf> {
         }
     });
 
-    candidates.sort_by(|a, b| template_candidate_rank(a).cmp(&template_candidate_rank(b)));
+    candidates.sort_by_key(|a| template_candidate_rank(a));
     candidates
 }
 

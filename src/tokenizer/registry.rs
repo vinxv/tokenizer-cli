@@ -23,8 +23,12 @@ use crate::{
 
 use super::{
     hf::{self, HfTokenizer},
-    ms, TokenizerBackend, TokenizerBackendKind,
+    ms, TokenizerBackend,
 };
+
+/// Backend label reported in API responses. Every supported tokenizer today is
+/// a HuggingFace-style BPE tokenizer loaded through `fastokens`.
+const HF_BACKEND: &str = "huggingface";
 
 /// Shared, lazily-initialised slot for one model's load task.
 type LoadSlot = Arc<OnceCell<Arc<dyn TokenizerBackend>>>;
@@ -35,7 +39,6 @@ pub struct RegistryModelInfo {
     pub backend: String,
     pub vocab_size: Option<usize>,
     pub status: String,
-    pub source: String,
     pub has_chat_template: bool,
     pub chat_template_source: Option<ChatTemplateSource>,
     pub chat_template_name: Option<String>,
@@ -48,7 +51,8 @@ pub struct Registry {
     loaded: Arc<DashMap<String, Arc<dyn TokenizerBackend>>>,
 
     /// Pre-scanned models found in the cache directory (fast read path).
-    scanned: Arc<DashMap<String, (TokenizerBackendKind, String)>>,
+    /// Stores the source label (`"huggingface"` / `"modelscope"`) per model id.
+    scanned: Arc<DashMap<String, String>>,
 
     /// Inflight / pending load slots — prevents duplicate concurrent downloads.
     inflight: Arc<Mutex<HashMap<String, LoadSlot>>>,
@@ -95,10 +99,7 @@ impl Registry {
                         let name = entry.file_name().to_string_lossy().to_string();
                         if let Some(rest) = name.strip_prefix("models--") {
                             let model_id = rest.replace("--", "/");
-                            self.scanned.insert(
-                                model_id.clone(),
-                                (TokenizerBackendKind::HuggingFace, "huggingface".to_string()),
-                            );
+                            self.scanned.insert(model_id.clone(), "huggingface".to_string());
                             self.refresh_cached_chat_template(&model_id);
                             tracing::info!("Scanned model from cache: '{model_id}'");
                         } else if let Some(rest) = name.strip_prefix("ms--") {
@@ -107,10 +108,7 @@ impl Registry {
                             } else {
                                 rest.replace("--", "/")
                             };
-                            self.scanned.insert(
-                                model_id.clone(),
-                                (TokenizerBackendKind::HuggingFace, "modelscope".to_string()),
-                            );
+                            self.scanned.insert(model_id.clone(), "modelscope".to_string());
                             self.refresh_cached_chat_template(&model_id);
                             tracing::info!("Scanned ModelScope model from cache: '{model_id}'");
                         }
@@ -126,15 +124,13 @@ impl Registry {
 
         // Add scanned ones first
         for entry in self.scanned.iter() {
-            let (backend, source) = entry.value();
             results.insert(
                 entry.key().clone(),
                 RegistryModelInfo {
                     model_id: entry.key().clone(),
-                    backend: backend.to_string(),
+                    backend: HF_BACKEND.to_string(),
                     vocab_size: None,
                     status: "scanned".to_string(),
-                    source: source.clone(),
                     has_chat_template: false,
                     chat_template_source: None,
                     chat_template_name: None,
@@ -145,23 +141,13 @@ impl Registry {
         // Override with fully loaded ones
         for entry in self.loaded.iter() {
             let info = entry.value().info();
-            let source = self
-                .scanned
-                .get(info.model_id.as_str())
-                .map(|s| s.value().1.clone())
-                .unwrap_or_else(|| match self.model_source {
-                    ModelSource::HuggingFace => "huggingface".to_string(),
-                    ModelSource::ModelScope => "modelscope".to_string(),
-                });
-
             results.insert(
                 info.model_id.clone(),
                 RegistryModelInfo {
                     model_id: info.model_id.clone(),
-                    backend: info.backend.to_string(),
+                    backend: HF_BACKEND.to_string(),
                     vocab_size: Some(info.vocab_size),
                     status: "loaded".to_string(),
-                    source,
                     has_chat_template: false,
                     chat_template_source: None,
                     chat_template_name: None,
@@ -283,7 +269,7 @@ impl Registry {
     }
 
     fn source_for_model(&self, model_id: &str) -> ModelSource {
-        let cached_source = self.scanned.get(model_id).map(|s| s.value().1.clone());
+        let cached_source = self.scanned.get(model_id).map(|s| s.value().clone());
         match cached_source.as_deref() {
             Some("modelscope") => ModelSource::ModelScope,
             Some("huggingface") => ModelSource::HuggingFace,

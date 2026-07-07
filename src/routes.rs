@@ -55,13 +55,59 @@ pub fn build_router(state: AppState, enable_web: bool) -> Router {
         .with_state(state);
 
     if enable_web {
-        router = router.route(
-            "/",
-            get(|| async { axum::response::Html(include_str!("web_ui.html")) }),
-        );
+        router = router
+            .route(
+                "/",
+                get(|| async { axum::response::Html(include_str!("web_ui.html")) }),
+            )
+            // ── Embedded fonts ──────────────────────────────────────────────
+            // Bundled into the binary via include_bytes! so the dashboard is
+            // fully self-contained — no requests to Google Fonts or any CDN,
+            // which matters for air-gapped / internal deployments.
+            .route(
+                "/fonts/ibm-plex-sans-300.woff2",
+                get(|| async {
+                    font_response(include_bytes!("fonts/IBMPlexSans-300.woff2").as_slice())
+                }),
+            )
+            .route(
+                "/fonts/ibm-plex-sans-400.woff2",
+                get(|| async {
+                    font_response(include_bytes!("fonts/IBMPlexSans-400.woff2").as_slice())
+                }),
+            )
+            .route(
+                "/fonts/ibm-plex-sans-500.woff2",
+                get(|| async {
+                    font_response(include_bytes!("fonts/IBMPlexSans-500.woff2").as_slice())
+                }),
+            )
+            .route(
+                "/fonts/ibm-plex-mono-400.woff2",
+                get(|| async {
+                    font_response(include_bytes!("fonts/IBMPlexMono-400.woff2").as_slice())
+                }),
+            )
+            .route(
+                "/fonts/ibm-plex-mono-500.woff2",
+                get(|| async {
+                    font_response(include_bytes!("fonts/IBMPlexMono-500.woff2").as_slice())
+                }),
+            );
     }
 
     router
+}
+
+/// Return an embedded woff2 font with the correct content-type.
+fn font_response(data: &'static [u8]) -> impl IntoResponse {
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            axum::http::HeaderValue::from_static("font/woff2"),
+        )],
+        data,
+    )
 }
 
 async fn ping() -> Json<serde_json::Value> {

@@ -24,10 +24,6 @@ pub enum AppError {
     /// Input validation failure (e.g. empty text, bad token ids).
     #[error("Invalid input: {0}")]
     InvalidInput(String),
-
-    /// Internal / unexpected error.
-    #[error("Internal error: {0}")]
-    Internal(#[from] anyhow::Error),
 }
 
 impl IntoResponse for AppError {
@@ -44,11 +40,6 @@ impl IntoResponse for AppError {
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "TOKENIZER_ERROR",
                 self.to_string(),
-            ),
-            AppError::Internal(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "INTERNAL_ERROR",
-                "An internal error occurred".to_string(),
             ),
         };
 

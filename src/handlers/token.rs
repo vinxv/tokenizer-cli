@@ -12,7 +12,7 @@ use crate::{error::AppResult, state::AppState};
 /// Input for `/v1/token/count` and `/v1/token/encode`.
 #[derive(Debug, Deserialize)]
 pub struct TextRequest {
-    /// HuggingFace model id or OpenAI model alias, e.g. `"gpt-4o"`.
+    /// Model id, e.g. `"Qwen/Qwen3-32B"`.
     pub model: String,
     /// The text to tokenize.
     pub text: String,
@@ -21,7 +21,7 @@ pub struct TextRequest {
 /// Input for `/v1/token/decode`.
 #[derive(Debug, Deserialize)]
 pub struct DecodeRequest {
-    /// HuggingFace model id or OpenAI model alias.
+    /// Model id, e.g. `"Qwen/Qwen3-32B"`.
     pub model: String,
     /// Token ids to decode.
     pub ids: Vec<u32>,

@@ -9,26 +9,6 @@ pub struct TokenizerInfo {
     pub model_id: String,
     /// Vocabulary size
     pub vocab_size: usize,
-    /// Short description of the backend being used
-    pub backend: TokenizerBackendKind,
-}
-
-/// Discriminates which backend is handling a given model.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TokenizerBackendKind {
-    /// HuggingFace / ModelScope BPE tokenizer loaded through `fastokens`
-    HuggingFace,
-    /// OpenAI `tiktoken` (cl100k_base, o200k_base, …)
-    Tiktoken,
-}
-
-impl std::fmt::Display for TokenizerBackendKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TokenizerBackendKind::HuggingFace => write!(f, "huggingface"),
-            TokenizerBackendKind::Tiktoken => write!(f, "tiktoken"),
-        }
-    }
 }
 
 /// The core trait every tokenizer backend must implement.
@@ -65,5 +45,4 @@ pub trait TokenizerBackend: Send + Sync {
 
 pub mod hf;
 pub mod ms;
-pub mod openai;
 pub mod registry;

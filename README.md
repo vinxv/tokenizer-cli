@@ -1,8 +1,28 @@
 # Tokenizer Service (tokenizer-svc)
 
-A high-performance, Rust-based microservice and CLI for LLM tokenization. It provides a unified interface for HuggingFace, ModelScope, and OpenAI (tiktoken) tokenizers.
+> **One self-contained binary** that exposes an LLM tokenizer over HTTP, from the CLI, and from a built-in web dashboard — pulling models from **HuggingFace** and **ModelScope**.
 
-> [中文文档](README.zh-CN.md)
+[![Build](https://github.com/vinxv/tokenizer-cli/actions/workflows/build.yml/badge.svg)](https://github.com/vinxv/tokenizer-cli/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
+[![Rust](https://img.shields.io/badge/rust-2021%2B-orange.svg)](https://www.rust-lang.org/)
+[![Release](https://img.shields.io/github/v/release/vinxv/tokenizer-cli)](https://github.com/vinxv/tokenizer-cli/releases)
+
+[中文文档](README.zh-CN.md) · [Quick start](#get-started) · [HTTP API](#http-api) · [CLI](#cli-reference)
+
+<p align="center">
+  <img src="assets/dashboard.png" alt="Tokenizer Web Dashboard" width="820">
+</p>
+
+---
+
+## Why
+
+Counting tokens, pre-splitting text, and rendering chat templates are everyday tasks when building on LLMs — for cost estimation, rate limiting, context-budgeting, and RAG chunking. The usual tools each leave a gap:
+
+- **`transformers`** pulls in a Python runtime and gigabytes of dependencies just to count tokens.
+- **`tiktoken`** only covers OpenAI models.
+
+`tokenizer-svc` is one static binary (~12 MB stripped) that gives you an HTTP API, a CLI, and a built-in web dashboard for interactive debugging，supporting HuggingFace and ModelScope, with chat-template rendering included. The dashboard is fully self-contained: fonts are embedded in the binary, so it makes no requests to any external CDN.
 
 ---
 
@@ -36,18 +56,42 @@ chmod +x tokenizer-cli
 
 Open `http://localhost:8080` in your browser — you're done.
 
+### 4. Or use the CLI directly
+
+No server required — `count`, `encode`, and `decode` work straight on the local cache:
+
+```bash
+./tokenizer-cli count  Qwen/Qwen3-32B "Hello world"
+./tokenizer-cli encode Qwen/Qwen3-32B "Hello world"
+./tokenizer-cli decode Qwen/Qwen3-32B 9707 1879
+```
+
+Add `--json` to any command for output matching the HTTP API response shape.
+
 > **Building from source?** See [Building from Source](#building-from-source).
+
+---
+
+## Web Dashboard
+
+Run `serve --enable-web` and open `http://localhost:8080` for an interactive dashboard with four tabs:
+
+- **Encode** — turn text into token IDs and a per-token table (Index / ID / text), with virtualized scrolling for long inputs.
+- **Decode** — paste token IDs (comma, space, or JSON-array separated) and get the text back.
+- **Count** — instant token count for any input.
+- **Render** — render Chat Completions `messages` to raw prompt text via the model's chat template, and count the result. Shown only for models that ship a `chat_template`.
+
+Every result shows request latency and a one-click copy button.
 
 ---
 
 ## Features
 
-- **Multi-Backend Support**: Integration with `fastokens` for BPE `tokenizer.json` files and `tiktoken-rs` for planned OpenAI support.
-- **Multi-Hub Model Pulling**: Seamlessly download models from **HuggingFace Hub** and **ModelScope**.
-- **Unified CLI**: A single binary for serving the API, pulling models, and performing token operations.
-- **HTTP API**: Standardized endpoints for token counting, encoding, decoding, and model discovery.
-- **Web Dashboard**: An optional, built-in internal web interface for interactive debugging and testing.
-- **Lazy Loading & Caching**: Models are loaded on-demand and cached locally for efficiency.
+- **Multi-Hub Model Pulling**: download tokenizer files from **HuggingFace Hub** and **ModelScope**, cached locally and loaded on demand.
+- **Unified CLI**: a single binary for serving the API, pulling models, and performing token operations.
+- **HTTP API**: standardized endpoints for token counting, encoding, decoding, model discovery, and chat-template rendering.
+- **Web Dashboard**: an optional, built-in internal web interface for interactive debugging and testing.
+- **Lazy Loading & Caching**: models are loaded on-demand and cached locally for efficiency.
 
 ---
 
@@ -63,8 +107,8 @@ Open `http://localhost:8080` in your browser — you're done.
 | `count <model> <text>` | Count tokens in the provided text. |
 | `encode <model> <text>` | Encode text into token IDs. |
 | `decode <model> <ids...>` | Decode token IDs back into text. |
-| `--help` | Print full help information. |
 | `ping` | Health check for the service. |
+| `--help` | Print full help information. |
 
 ---
 
@@ -75,8 +119,8 @@ Returns a list of all models discovered in the cache or loaded in memory.
 Each model includes `has_chat_template`, `chat_template_source`, and `chat_template_name`; the Web Dashboard uses them to show the Render tab only for models with a cached `chat_template` or `.jinja` template.
 
 ### POST `/v1/token/count`
-**Body**: `{"model": "gpt-4o", "text": "Hello world"}`
-**Response**: `{"model": "gpt-4o", "count": 2}`
+**Body**: `{"model": "Qwen/Qwen3-32B", "text": "Hello world"}`
+**Response**: `{"model": "Qwen/Qwen3-32B", "count": 2}`
 
 ### POST `/v1/token/encode`
 **Body**: `{"model": "Qwen/Qwen3-32B", "text": "Hello world"}`
@@ -174,3 +218,9 @@ cargo build --release
 ```
 
 The binary will be at `target/release/tokenizer-cli`.
+
+---
+
+## License
+
+Licensed under the [MIT License](LICENSE).

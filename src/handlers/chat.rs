@@ -10,7 +10,7 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub struct ChatRenderRequest {
-    /// HuggingFace / ModelScope model id or OpenAI alias.
+    /// Model id (HuggingFace or ModelScope), e.g. `"Qwen/Qwen3-32B"`.
     pub model: String,
     /// OpenAI Chat Completions-style messages.
     pub messages: Vec<Value>,

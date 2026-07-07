@@ -97,7 +97,7 @@ enum Command {
 
     /// Count tokens in TEXT using MODEL (mirrors POST /v1/token/count).
     Count {
-        /// Model id or OpenAI alias, e.g. `gpt-4o` or `Qwen/Qwen3-32B`.
+        /// Model id, e.g. `Qwen/Qwen3-32B`.
         model: String,
         /// Text to count tokens in.
         text: String,
@@ -105,7 +105,7 @@ enum Command {
 
     /// Encode TEXT into token ids using MODEL (mirrors POST /v1/token/encode).
     Encode {
-        /// Model id or OpenAI alias.
+        /// Model id, e.g. `Qwen/Qwen3-32B`.
         model: String,
         /// Text to encode.
         text: String,
@@ -113,7 +113,7 @@ enum Command {
 
     /// Decode token ids into text using MODEL (mirrors POST /v1/token/decode).
     Decode {
-        /// Model id or OpenAI alias.
+        /// Model id, e.g. `Qwen/Qwen3-32B`.
         model: String,
         /// One or more token ids to decode.
         #[arg(required = true)]

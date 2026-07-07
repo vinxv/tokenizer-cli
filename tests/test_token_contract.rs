@@ -32,7 +32,7 @@ async fn count_missing_text_field_returns_error() {
     let res = srv
         .client
         .post(format!("{}/v1/token/count", srv.base_url))
-        .json(&serde_json::json!({ "model": "gpt-4o" })) // missing "text"
+        .json(&serde_json::json!({ "model": "some-model" })) // missing "text"
         .send()
         .await
         .expect("request failed");
@@ -64,27 +64,6 @@ async fn encode_unknown_model_returns_404() {
     assert_eq!(res.status(), 404);
 }
 
-/// Successful encode must return `model` + `ids` array + token text array.
-#[tokio::test]
-#[ignore = "Requires a real backend to be implemented (Phase 1)"]
-async fn encode_response_shape() {
-    let srv = common::spawn_server().await;
-    let res = srv
-        .client
-        .post(format!("{}/v1/token/encode", srv.base_url))
-        .json(&serde_json::json!({ "model": "gpt-4o", "text": "Hello" }))
-        .send()
-        .await
-        .expect("request failed");
-
-    assert_eq!(res.status(), 200);
-    let body: serde_json::Value = res.json().await.expect("json parse");
-    assert!(body["model"].is_string());
-    assert!(body["ids"].is_array());
-    assert!(body["tokens"].is_array());
-    assert!(!body["ids"].as_array().unwrap().is_empty());
-}
-
 // ── /v1/token/decode ──────────────────────────────────────────────────────────
 
 /// An unknown model should return 404.
@@ -103,22 +82,4 @@ async fn decode_unknown_model_returns_404() {
         .expect("request failed");
 
     assert_eq!(res.status(), 404);
-}
-
-/// Empty ids array should return 200 with an empty string.
-#[tokio::test]
-#[ignore = "Requires a real backend to be implemented (Phase 1)"]
-async fn decode_empty_ids_returns_empty_string() {
-    let srv = common::spawn_server().await;
-    let res = srv
-        .client
-        .post(format!("{}/v1/token/decode", srv.base_url))
-        .json(&serde_json::json!({ "model": "gpt-4o", "ids": [] }))
-        .send()
-        .await
-        .expect("request failed");
-
-    assert_eq!(res.status(), 200);
-    let body: serde_json::Value = res.json().await.expect("json parse");
-    assert_eq!(body["text"], "");
 }

@@ -21,7 +21,7 @@ use tracing::{debug, info, warn};
 
 use crate::error::{AppError, AppResult};
 
-use super::{TokenizerBackend, TokenizerBackendKind, TokenizerInfo};
+use super::{TokenizerBackend, TokenizerInfo};
 
 // ── Known tokenizer files ─────────────────────────────────────────────────────
 
@@ -37,23 +37,14 @@ pub const TOKENIZER_FILES: &[(&str, bool)] = &[
     ("vocab.txt", false),
 ];
 
-// ── Pull (download only) ──────────────────────────────────────────────────────
+// ── Internal helpers ──────────────────────────────────────────────────────────
 
-/// Download all known tokenizer files for `model_id` into the cache directory.
-///
-/// Returns a list of `(filename, local_path)` for every file that was
-/// successfully fetched. Skips optional files that the model does not have
-/// (404 / 401 are treated as "not present" for optional files).
-///
-/// # Arguments
-/// * `model_id`  — HuggingFace repo id, e.g. `"meta-llama/Meta-Llama-3-8B"`.
-/// * `cache_dir` — Directory where downloaded files are stored.
-/// * `hf_token`  — Optional bearer token for private / gated models.
-pub async fn pull(
+/// Build a configured `hf-hub` tokio API client (shared by `pull` and `load`).
+fn build_hf_api(
     model_id: &str,
     cache_dir: &str,
     hf_token: Option<&str>,
-) -> AppResult<Vec<(String, PathBuf)>> {
+) -> AppResult<hf_hub::api::tokio::Api> {
     let mut builder = ApiBuilder::new();
     if !cache_dir.is_empty() {
         builder = builder.with_cache_dir(cache_dir.into());
@@ -61,12 +52,36 @@ pub async fn pull(
     if let Some(token) = hf_token {
         builder = builder.with_token(Some(token.to_string()));
     }
-
-    let api = builder.build().map_err(|e| AppError::LoadError {
+    builder.build().map_err(|e| AppError::LoadError {
         model: model_id.to_string(),
         reason: format!("failed to build HF API client: {e}"),
-    })?;
+    })
+}
 
+/// Heuristic: does this hf-hub error mean "model / file not present"?
+fn is_missing(err: &dyn std::fmt::Display) -> bool {
+    let msg = err.to_string();
+    msg.contains("401")
+        || msg.contains("Unauthorized")
+        || msg.contains("404")
+        || msg.contains("not found")
+        || msg.contains("Not Found")
+        || msg.contains("does not exist")
+}
+
+// ── Pull (download only) ──────────────────────────────────────────────────────
+
+/// Download all known tokenizer files for `model_id` into the cache directory.
+///
+/// Returns a list of `(filename, local_path)` for every file that was
+/// successfully fetched. Skips optional files that the model does not have
+/// (404 / 401 are treated as "not present" for optional files).
+pub async fn pull(
+    model_id: &str,
+    cache_dir: &str,
+    hf_token: Option<&str>,
+) -> AppResult<Vec<(String, PathBuf)>> {
+    let api = build_hf_api(model_id, cache_dir, hf_token)?;
     let repo = api.repo(Repo::new(model_id.to_string(), RepoType::Model));
 
     let mut results: Vec<(String, PathBuf)> = Vec::new();
@@ -79,16 +94,8 @@ pub async fn pull(
                 results.push((filename.to_string(), path));
             }
             Err(e) => {
-                let msg = e.to_string();
-                let is_missing = msg.contains("401")
-                    || msg.contains("404")
-                    || msg.contains("Unauthorized")
-                    || msg.contains("Not Found")
-                    || msg.contains("not found")
-                    || msg.contains("does not exist");
-
                 if required {
-                    return Err(if is_missing {
+                    return Err(if is_missing(&e) {
                         AppError::ModelNotFound(model_id.to_string())
                     } else {
                         AppError::LoadError {
@@ -126,38 +133,14 @@ impl HfTokenizer {
     pub async fn load(model_id: &str, cache_dir: &str, hf_token: Option<&str>) -> AppResult<Self> {
         debug!("Loading HF tokenizer for '{model_id}'");
 
-        // Build the Hub API client
-        let mut builder = ApiBuilder::new();
-
-        if !cache_dir.is_empty() {
-            builder = builder.with_cache_dir(cache_dir.into());
-        }
-
-        if let Some(token) = hf_token {
-            builder = builder.with_token(Some(token.to_string()));
-        }
-
-        let api = builder.build().map_err(|e| AppError::LoadError {
-            model: model_id.to_string(),
-            reason: format!("failed to build HF API client: {e}"),
-        })?;
-
-        // Resolve the tokenizer.json path (downloads if not cached)
+        let api = build_hf_api(model_id, cache_dir, hf_token)?;
         let repo = api.repo(Repo::new(model_id.to_string(), RepoType::Model));
 
+        // Resolve the tokenizer.json path (downloads if not cached).
+        // 401 = repo doesn't exist (unauthenticated), 404 = file missing → both
+        // mean "model not usable" for the caller.
         let tokenizer_path = repo.get("tokenizer.json").await.map_err(|e| {
-            let reason = e.to_string();
-            // HuggingFace returns 401 for repos that don't exist (unauthenticated)
-            // and 404 for repos that exist but the file is missing (authenticated).
-            // Both cases mean "model not usable" from the caller's perspective.
-            if reason.contains("401")
-                || reason.contains("Unauthorized")
-                || reason.contains("404")
-                || reason.contains("not found")
-                || reason.contains("Not Found")
-                || reason.contains("does not exist")
-                || reason.contains("404 Not Found")
-            {
+            if is_missing(&e) {
                 AppError::ModelNotFound(model_id.to_string())
             } else {
                 AppError::LoadError {
@@ -233,7 +216,6 @@ impl TokenizerBackend for HfTokenizer {
         TokenizerInfo {
             model_id: self.model_id.clone(),
             vocab_size: self.vocab_size,
-            backend: TokenizerBackendKind::HuggingFace,
         }
     }
 
